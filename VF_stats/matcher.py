@@ -137,9 +137,19 @@ def etage1(seh, f):
         elif classe_exclue in f["comparateur"]["classes"]:
             raisons.append(f"le bras contrôle reçoit déjà un {classe_exclue}")
 
+    # traitement : la cible de la molécule d'abord (critère biologique) ; la classe en repli
     c = contrainte(seh, "traitement")
     classe = c["tolere"]["classe"] if c else None
-    if classe and classe not in classes_traitement(f):
+    ct = contrainte(seh, "cible")
+    cibles_requises = {x.upper() for x in ct["valeur"]["cibles"]} if ct else set()
+    cibles_fiche = {str(x).upper() for x in f.get("cibles") or []}
+    if ct and cibles_fiche:
+        if not (cibles_requises & cibles_fiche):
+            raisons.append(f"la molécule étudiée ne vise pas {'/'.join(sorted(cibles_requises))} "
+                           f"(cibles : {', '.join(sorted(cibles_fiche))})")
+    elif classe and classe not in classes_traitement(f):
+        if ct:
+            avert.append("cible de la molécule non renseignée : jugé sur la classe de médicament")
         autres = ", ".join(sorted(classes_traitement(f))) or "aucune molécule de la classe trouvée"
         raisons.append(f"pas de {classe} étudié ({autres})")
     return raisons
@@ -186,6 +196,11 @@ def etage2(seh, f):
     else:
         score *= s
         plafond = min_niveau(plafond, c["plafond_preuve"])
+        meilleure = max(mols, key=lambda m: c["table_substitution"].get(m, 0))
+        plafond_mol = c.get("table_plafond", {}).get(meilleure)
+        if plafond_mol:
+            plafond = min_niveau(plafond, plafond_mol)
+            expl.append(f"même cible mais autre mécanisme ({meilleure}) : niveau plafonné à {plafond_mol}")
         expl.append(f"molécule {', '.join(mols)} au lieu de {', '.join(c['ideal']['molecules'])} "
                     f"(même classe) : score {s}, niveau plafonné à {c['plafond_preuve']} "
                     "tant qu'une réplication avec la molécule exacte manque")

@@ -17,6 +17,8 @@ import urllib.request
 API = "https://clinicaltrials.gov/api/v2/studies"
 CLASSES = {"cetuximab": "anti-EGFR", "panitumumab": "anti-EGFR",
            "bevacizumab": "anti-VEGF", "aflibercept": "anti-VEGF"}
+CIBLES_CONNUES = {"cetuximab": "EGFR", "panitumumab": "EGFR", "gefitinib": "EGFR",
+                  "erlotinib": "EGFR", "bevacizumab": "VEGF", "aflibercept": "VEGF"}
 CHIMIO = re.compile(r"folf|oxaliplatin|irinotecan|fluorouracil|5-fu|capecitabin|leucovorin|xelox|capox", re.I)
 CRITERES = [(re.compile(r"progression[- ]free|\bPFS\b", re.I), "PFS"),
             (re.compile(r"overall survival|\bOS\b", re.I), "OS"),
@@ -94,6 +96,7 @@ def vers_fiche(study):
         "indication": conditions,
         "stade": stade_de(texte_stade),
         "randomise": design.get("designInfo", {}).get("allocation") == "RANDOMIZED",
+        "cibles": sorted({CIBLES_CONNUES[m] for m in mols if m in CIBLES_CONNUES}),
         "traitement": {"molecules": mols, "classes": classes_exp,
                        "classe": classes_exp[0] if len(classes_exp) == 1 else None},
         "comparateur": {"description": "; ".join(n for b in ctrl for n in b["interventions"]) or None,

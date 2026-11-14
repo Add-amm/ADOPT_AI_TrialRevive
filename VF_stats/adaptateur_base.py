@@ -31,6 +31,19 @@ FENETRE_TISSU_J = [-3650, -1]                    # tissu archivé avant la premi
 STADE = {"advanced": "metastatique", "early": "local"}
 CONSENT = {"broad": "biomarqueurs", "optional": "optionnel", "restricted": "restreint"}
 ROLE_EXP = {"experimental"}
+CIBLES_CONNUES = {"cetuximab": "EGFR", "panitumumab": "EGFR", "gefitinib": "EGFR",
+                  "erlotinib": "EGFR", "bevacizumab": "VEGF", "aflibercept": "VEGF",
+                  "evolocumab": "PCSK9", "alirocumab": "PCSK9", "clopidogrel": "P2Y12"}
+
+
+def cibles_de(mols, cibles_base=()):
+    out = {str(c).upper() for c in cibles_base if c}
+    for m in mols or []:
+        for mol, cible in CIBLES_CONNUES.items():
+            if mol in str(m).lower():
+                out.add(cible)
+    return sorted(out)
+
 CLASSES_CONNUES = {"cetuximab": "anti-EGFR", "panitumumab": "anti-EGFR",
                    "bevacizumab": "anti-VEGF", "aflibercept": "anti-VEGF"}
 CRITERES = [(re.compile(r"pfs|progression", re.I), "PFS"), (re.compile(r"\bos\b|overall.?survival", re.I), "OS"),
@@ -86,6 +99,7 @@ def vers_fiche(j):
            [str(d).lower() for b in bras if b["type"] == "EXPERIMENTAL" for d in b["interventions"]] or \
            [i.get("name", "").lower() for i in j.get("interventions") or [] if i.get("kind") in (None, "drug", "biological")]
     cl_exp = classes_de(mols, contrast.get("differential_classes"))
+    cibles_base = [t for i in j.get("interventions") or [] for t in (i.get("targets") or [])]
     cl_ctrl = sorted({c for b in bras if b["type"] != "EXPERIMENTAL" for c in b["classes"]})
 
     stade = STADE.get(ind.get("setting"))
@@ -134,6 +148,7 @@ def vers_fiche(j):
         "domaine": ind.get("domain"), "stade": stade, "ligne": ind.get("line"),
         "randomise": bool(design.get("randomized")),
         "traitement": {"molecules": mols, "classes": cl_exp, "classe": cl_exp[0] if len(cl_exp) == 1 else None},
+        "cibles": cibles_de(mols, cibles_base),
         "comparateur": {"description": ", ".join(contrast.get("control_arms") or []) or None,
                         "classes": cl_ctrl, "type_contraste": contrast.get("type")},
         "effectif_randomise": effectif,

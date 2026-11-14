@@ -271,3 +271,28 @@ def test_doublons_entre_corpus_comptes_une_fois(seh):
     b = copy.deepcopy(a); b["corpus"] = "autre_corpus.jsonl.gz"
     r = matcher.apparier(seh, [a, b])
     assert r["n_essais_examines"] == 1 and r["n_lignes_recues"] == 2 and len(r["externes"]) == 1
+
+
+# --- critère de cible moléculaire (remarque de la chirurgienne, 14 nov.)
+def test_cible_differente_exclue_meme_indication(seh):
+    # bévacizumab vise VEGF, pas EGFR : écarté sur la cible, le critère biologique
+    r = matcher.apparier(seh, [adaptateur_base.vers_fiche(_rec("NCT_C1", 900, drugs=("bevacizumab",)))])
+    assert r["exclus"] and "ne vise pas EGFR" in r["exclus"][0]["raisons"][0]
+
+
+def test_meme_cible_autre_mecanisme_tolere_et_plafonne(seh):
+    # géfitinib vise EGFR mais n'est pas un anticorps : gardé, score 0,4, preuve plafonnée à E2
+    r = matcher.apparier(seh, [adaptateur_base.vers_fiche(_rec("NCT_C2", 1100, drugs=("gefitinib",)))])
+    assert r["externes"], r["exclus"]
+    e = r["externes"][0]
+    assert e["niveau_preuve_atteignable"] == "E2"
+    assert any("autre mécanisme" in x for x in e["ecarts"])
+
+
+def test_cible_inconnue_repli_sur_la_classe(seh):
+    f = adaptateur_base.vers_fiche(_rec("NCT_C3", 900))
+    f["cibles"] = []
+    f["traitement"]["classes"] = ["anti-VEGF"]
+    f["traitement"]["classe"] = "anti-VEGF"
+    r = matcher.apparier(seh, [f])
+    assert r["exclus"] and "pas de anti-EGFR étudié" in r["exclus"][0]["raisons"][0]

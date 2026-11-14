@@ -51,6 +51,16 @@
       }
     },
     {
+      "champ": "cible",
+      "niveau": "obligatoire",
+      "valeur": {
+        "cibles": [
+          "EGFR"
+        ]
+      },
+      "explication": "KRAS est en aval d'EGFR : la biologie de l'hypothèse vaut pour toute molécule visant EGFR, quel que soit son nom ; la modalité reste une tolérance"
+    },
+    {
       "champ": "traitement",
       "niveau": "tolere",
       "ideal": {
@@ -63,11 +73,17 @@
       },
       "table_substitution": {
         "panitumumab": 1.0,
-        "cetuximab": 0.8
+        "cetuximab": 0.8,
+        "gefitinib": 0.4,
+        "erlotinib": 0.4
       },
       "plafond_preuve": "E3",
       "regle": "TOL-MOLECULE-v1",
-      "explication": "molécule différente de la même classe : réplication avec la molécule exacte avant E4"
+      "explication": "molécule différente de la même classe : réplication avec la molécule exacte avant E4 ; un TKI anti-EGFR (géfitinib, erlotinib) vise la même cible mais par un autre mécanisme : score 0,4 et plafond E2, à valider",
+      "table_plafond": {
+        "gefitinib": "E2",
+        "erlotinib": "E2"
+      }
     },
     {
       "champ": "critere",

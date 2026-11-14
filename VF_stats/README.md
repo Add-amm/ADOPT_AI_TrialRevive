@@ -74,6 +74,14 @@ ne donne ni les prélèvements, ni la couverture, ni le taux d'événements, ni 
 On remplit ces champs (`prelevements`, `taux_collecte_prevu`, `taux_evenements_prevu`,
 `consentement_portee`) à la main ou par lecture IA, avec la source dans `sources`.
 
+## Critère de cible moléculaire (remarque de la chirurgienne, 14 nov.)
+
+La fiche de la question porte une contrainte obligatoire `cible` (EGFR pour le cas KRAS). L'étage 1
+juge d'abord la cible de la molécule (`cibles` dans la fiche d'essai, remplie depuis `interventions[].targets`
+de la base et un dictionnaire de molécules connues) ; la classe de médicament ne sert plus que de repli
+quand la cible n'est pas renseignée, avec un avertissement. Une molécule de même cible mais d'un autre
+mécanisme (géfitinib, erlotinib) est tolérée : score 0,4 et plafond E2, valeurs à valider avec la biologiste.
+
 ## Revue de Léo (14 nov.) : ce qui est intégré
 
 | n° | Correction | Où |
