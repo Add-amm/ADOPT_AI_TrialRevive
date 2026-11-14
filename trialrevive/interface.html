@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TrialRevive · Dossier de faisabilité</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f6f4ef; --paper:#fffdf8; --ink:#1c2321; --muted:#5f6b67; --line:#e2ddd2;
+    --teal:#0f6e66; --teal-soft:#e3f0ee; --amber:#b86e00; --amber-soft:#fbefd9;
+    --red:#a8382b; --red-soft:#f7e3df; --grey-soft:#efece5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+  header{border-bottom:1px solid var(--line);background:var(--paper)}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:18px 0;gap:16px;flex-wrap:wrap}
+  .brand{font-family:Fraunces,serif;font-size:24px;font-weight:600;letter-spacing:-.01em}
+  .brand span{color:var(--teal)}
+  .tag{font-size:13px;color:var(--muted)}
+  .btn{font:500 14px Inter;border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:8px;padding:9px 14px;cursor:pointer}
+  .btn.ghost{background:transparent;color:var(--ink)}
+  .btn:focus-visible,.tabs button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+  label.btn input{display:none}
+  main.wrap{padding:28px 24px 64px}
+  .question{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:22px}
+  .eyebrow{font:500 12px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .question h1{font-family:Fraunces,serif;font-weight:500;font-size:24px;line-height:1.3;margin:0 0 14px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font:500 12.5px 'JetBrains Mono',monospace;background:var(--grey-soft);border-radius:6px;padding:4px 8px}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px}
+  .kpi{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .kpi b{display:block;font-family:Fraunces,serif;font-size:30px;font-weight:600;line-height:1.1}
+  .kpi small{color:var(--muted);font-size:13px}
+  .grid2{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-bottom:22px}
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+  .panel h2{font-family:Fraunces,serif;font-weight:500;font-size:19px;margin:0 0 4px}
+  .panel p.sub{margin:0 0 16px;color:var(--muted);font-size:13.5px}
+  .funnel .row{display:grid;grid-template-columns:150px 1fr 48px;align-items:center;gap:10px;margin:8px 0;font-size:13.5px}
+  .bar{height:22px;border-radius:5px;background:var(--teal);min-width:3px}
+  .bar.l2{background:#3d8f87}.bar.l3{background:#79b4ad}.bar.l4{background:var(--amber)}
+  .funnel .n{font:500 13px 'JetBrains Mono';text-align:right}
+  .gain{display:flex;gap:18px;align-items:flex-end;height:150px;padding-top:6px}
+  .gcol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+  .gcol .g{width:70%;border-radius:6px 6px 0 0;background:var(--grey-soft);border:1px solid var(--line)}
+  .gcol.on .g{background:var(--teal);border-color:var(--teal)}
+  .gcol b{font-family:Fraunces,serif;font-size:22px;margin-bottom:4px}
+  .gcol small{margin-top:6px;font-size:12.5px;color:var(--muted);text-align:center}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
+  .tabs button{font:500 14px Inter;background:none;border:none;padding:10px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tabs button.on{color:var(--ink);border-color:var(--ink)}
+  .count{font:500 12px 'JetBrains Mono';background:var(--grey-soft);border-radius:10px;padding:1px 7px;margin-left:4px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:12px}
+  .card .head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  .rank{font:600 13px 'JetBrains Mono';color:var(--muted);margin-right:8px}
+  .card h3{margin:0;font-size:16px;font-weight:600}
+  .meta{font-size:13px;color:var(--muted);margin-top:2px}
+  .badges{display:flex;gap:6px;flex-wrap:wrap}
+  .badge{font:600 12.5px 'JetBrains Mono';border-radius:6px;padding:4px 8px}
+  .E3,.E4{background:var(--teal-soft);color:var(--teal)}
+  .E2{background:var(--amber-soft);color:var(--amber)}
+  .E0,.E1{background:var(--red-soft);color:var(--red)}
+  .R{background:var(--grey-soft)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}
+  .stat small{display:block;color:var(--muted);font-size:12px}
+  .stat b{font:500 15px 'JetBrains Mono'}
+  .meter{height:6px;background:var(--grey-soft);border-radius:3px;margin-top:5px;position:relative}
+  .meter i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--teal)}
+  .meter .seuil{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);left:80%}
+  details{border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
+  summary{cursor:pointer;font-size:13.5px;font-weight:500}
+  ul.tight{margin:8px 0 0;padding-left:18px;font-size:13.5px}
+  ul.tight li{margin:3px 0}
+  .ecart{color:var(--amber)}
+  .gainlist{font-size:13px;color:var(--muted);margin-top:8px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-weight:600;font-size:12.5px;color:var(--muted);background:var(--grey-soft)}
+  td.mono{font-family:'JetBrains Mono';font-size:12.5px;white-space:nowrap}
+  .filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .filters button{font:500 13px Inter;border:1px solid var(--line);background:var(--paper);border-radius:20px;padding:5px 12px;cursor:pointer}
+  .filters button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .empty{padding:24px;text-align:center;color:var(--muted);background:var(--paper);border:1px dashed var(--line);border-radius:12px}
+  .note{font-size:12.5px;color:var(--muted);margin-top:18px}
+  .err{background:var(--red-soft);color:var(--red);padding:10px 14px;border-radius:8px;margin-bottom:16px;display:none}
+  @media (max-width:860px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header><div class="wrap top">
+  <div><div class="brand">Trial<span>Revive</span></div><div class="tag">Les réponses qui dorment dans les essais terminés</div></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn ghost" id="demo">Données de démo</button>
+    <label class="btn">Charger un résultat (.json)<input type="file" id="file" accept=".json,application/json"></label>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <div class="err" id="err"></div>
+
+  <section class="question">
+    <div class="eyebrow">Question scientifique · <span id="sehid"></span></div>
+    <h1 id="enonce"></h1>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="grid2">
+    <div class="panel">
+      <h2>L'entonnoir</h2>
+      <p class="sub">Chaque étage écarte des essais avant le calcul plus coûteux suivant.</p>
+      <div class="funnel" id="funnel"></div>
+    </div>
+    <div class="panel">
+      <h2>Le gain pour le prochain essai</h2>
+      <p class="sub" id="gainsub"></p>
+      <div class="gain" id="gain"></div>
+    </div>
+  </section>
+
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <section id="view"></section>
+
+  <p class="note">L'IA propose, le code tranche : chaque chiffre vient d'un calcul vérifiable et porte sa source. Les essais internes et externes ne sont jamais classés ensemble.</p>
+</main>
+
+<script>
+const DEMO = {"seh_id": "SEH-KRAS-2009", "version": 1, "enonce": "Le statut KRAS sauvage de la tumeur prédit le bénéfice d'un anti-EGFR par rapport à un contrôle sans anti-EGFR, en survie sans progression, dans le cancer colorectal métastatique.", "exigence_statistique": {"evenements_min": 206, "methode": "(z1-a/2 + z1-b)^2 × 4 (1/p + 1/(1-p)) / (ln HR+ - ln HR-)^2", "alpha": 0.05, "puissance": 0.8}, "taille_essai_confirmation": {"hr_dilue_tous": 0.632, "evenements_essai_tous": 149, "evenements_essai_x_plus": 50, "hypotheses": {"hr_x_plus": 0.45, "hr_x_moins": 0.99, "prevalence_x": 0.57, "alpha": 0.05, "puissance": 0.8}, "methode": "Schoenfeld, randomisation 1:1"}, "internes": [{"trial_id": "FICTIF-INT-01", "titre": "Panitumumab + soins de support vs soins de support seuls", "index": "interne", "detenteur": "Détenteur fictif", "score_compatibilite": 1.0, "bonus_ideal": 5, "effectif_randomise": 460, "ecarts": [], "prelevement_retenu": {"materiel": "tissu_tumoral_fixe", "instant_j": [-400, -1], "bras": ["panitumumab", "controle"], "statut": "prevu"}, "couverture_prevue": 0.92, "puissance_a_priori": {"valeur": 0.968, "evenements_attendus": {"x_plus": 217, "x_moins": 164}, "methode": "effectif × prévalence × couverture prévue × taux d'événements ; var ln(HR+/HR-) ≈ 4/d+ + 4/d-", "source": "calcul TrialRevive sur la fiche"}, "voie": {"code": "R2", "explication": "nouvelle analyse de KRAS sur le tissu archivé"}, "niveau_preuve_atteignable": "E3", "conditions_restantes": ["fixer le plan d'analyse avant les mesures", "utiliser une méthode de mesure validée", "lancer l'étage 3 : compter les patients S4 chez le détenteur", "E4 si un second essai concordant est disponible"], "gains": [{"code": "G1", "libelle": "Décision de poursuite ou d'arrêt accélérée"}, {"code": "G2", "libelle": "Population mieux ciblée pour l'essai suivant"}, {"code": "G3", "libelle": "Essai de confirmation de taille réduite"}, {"code": "G4", "libelle": "Restriction ou sauvetage d'une indication"}, {"code": "G5", "libelle": "Repositionnement ou relance, confirmation prospective requise"}, {"code": "G6", "libelle": "Stratégie de diagnostic compagnon"}], "sources": {"*": {"doc": "fiche fictive de démonstration", "passage": null}}}], "externes": [{"trial_id": "FICTIF-EXT-02", "titre": "Cétuximab vs soins de support", "index": "externe", "detenteur": "Groupe coopérateur fictif", "score_compatibilite": 0.56, "bonus_ideal": 2, "effectif_randomise": 572, "ecarts": ["molécule cetuximab au lieu de panitumumab (même classe) : score 0.8, niveau plafonné à E3 tant qu'une réplication avec la molécule exacte manque", "couverture prévue 69%, entre 60% et 80% : niveau plafonné à E2", "portée du consentement inconnu : à vérifier chez le détenteur (score 0.7)"], "prelevement_retenu": {"materiel": "tissu_tumoral_fixe", "instant_j": [-400, -1], "bras": ["cetuximab", "controle"], "statut": "prevu"}, "couverture_prevue": 0.69, "puissance_a_priori": {"valeur": 0.957, "evenements_attendus": {"x_plus": 202, "x_moins": 153}, "methode": "effectif × prévalence × couverture prévue × taux d'événements ; var ln(HR+/HR-) ≈ 4/d+ + 4/d-", "source": "calcul TrialRevive sur la fiche"}, "voie": {"code": "R2", "explication": "nouvelle analyse de KRAS sur le tissu archivé"}, "niveau_preuve_atteignable": "E2", "conditions_restantes": ["fixer le plan d'analyse avant les mesures", "utiliser une méthode de mesure validée", "obtenir l'accès auprès du détenteur (vérification sur place impossible)"], "gains": [{"code": "G1", "libelle": "Décision de poursuite ou d'arrêt accélérée"}, {"code": "G2", "libelle": "Population mieux ciblée pour l'essai suivant"}, {"code": "G5", "libelle": "Repositionnement ou relance, confirmation prospective requise"}], "sources": {"*": {"doc": "fiche fictive de démonstration", "passage": null}}}, {"trial_id": "FICTIF-EXT-07", "titre": "Cétuximab + FOLFOX vs FOLFOX, critère taux de réponse", "index": "externe", "detenteur": "Détenteur fictif", "score_compatibilite": 0.48, "bonus_ideal": 3, "effectif_randomise": 600, "ecarts": ["molécule cetuximab au lieu de panitumumab (même classe) : score 0.8, niveau plafonné à E3 tant qu'une réplication avec la molécule exacte manque", "critère substitué (ORR) : niveau plafonné à E2 ; puissance calculée comme pour un critère de survie, donc approximative"], "prelevement_retenu": {"materiel": "tissu_tumoral_fixe", "instant_j": [-400, -1], "bras": ["cetuximab", "controle"], "statut": "prevu"}, "couverture_prevue": 0.85, "puissance_a_priori": {"valeur": 0.958, "evenements_attendus": {"x_plus": 203, "x_moins": 154}, "methode": "effectif × prévalence × couverture prévue × taux d'événements ; var ln(HR+/HR-) ≈ 4/d+ + 4/d-", "source": "calcul TrialRevive sur la fiche"}, "voie": {"code": "R2", "explication": "nouvelle analyse de KRAS sur le tissu archivé"}, "niveau_preuve_atteignable": "E2", "conditions_restantes": ["fixer le plan d'analyse avant les mesures", "utiliser une méthode de mesure validée", "obtenir l'accès auprès du détenteur (vérification sur place impossible)"], "gains": [{"code": "G1", "libelle": "Décision de poursuite ou d'arrêt accélérée"}, {"code": "G2", "libelle": "Population mieux ciblée pour l'essai suivant"}, {"code": "G5", "libelle": "Repositionnement ou relance, confirmation prospective requise"}], "sources": {"*": {"doc": "fiche fictive de démonstration", "passage": null}}}], "exclus": [{"trial_id": "FICTIF-EXT-03", "titre": "Panitumumab en bras unique", "etage": 1, "raisons": ["pas de groupe contrôle tiré au sort"]}, {"trial_id": "FICTIF-EXT-04", "titre": "FOLFIRI + panitumumab vs FOLFIRI (débuté après 2009)", "etage": 1, "raisons": ["essai débuté le 2010-06-01, pas avant la date de l'hypothèse (2009-01-01)"]}, {"trial_id": "FICTIF-EXT-05", "titre": "Cétuximab + FOLFOX vs FOLFOX, tissu seulement dans le bras traité", "etage": 2, "raisons": ["tissu prévu seulement dans le(s) bras cetuximab, pas dans controle : interaction non testable"], "ecarts_avant_exclusion": ["molécule cetuximab au lieu de panitumumab (même classe) : score 0.8, niveau plafonné à E3 tant qu'une réplication avec la molécule exacte manque"]}, {"trial_id": "FICTIF-EXT-06", "titre": "Petit essai randomisé panitumumab vs soins de support", "etage": 2, "raisons": ["puissance a priori pour l'interaction 42% < 80% (environ 82 événements attendus)"], "ecarts_avant_exclusion": []}, {"trial_id": "FICTIF-EXT-08", "titre": "Panitumumab vs cétuximab (contrôle contenant un anti-EGFR)", "etage": 1, "raisons": ["le bras contrôle reçoit déjà un anti-EGFR"]}], "a_completer": [], "n_essais_examines": 8};
+let R = DEMO, tab = 'internes', filtre = 0;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct = v => Math.round(v * 100) + ' %';
+const fr = v => String(v).replace('.', ',');
+
+function render(){
+  const e = R.exigence_statistique || {}, t = R.taille_essai_confirmation || {}, h = t.hypotheses || {};
+  $('#sehid').textContent = `${R.seh_id || ''} v${R.version || ''}`;
+  $('#enonce').textContent = R.enonce || '';
+  $('#chips').innerHTML = [
+    h.hr_x_plus != null && `HR⁺ = ${fr(h.hr_x_plus)}`, h.hr_x_moins != null && `HR⁻ = ${fr(h.hr_x_moins)}`,
+    h.prevalence_x != null && `prévalence = ${pct(h.prevalence_x)}`, e.alpha != null && `α = ${pct(e.alpha)}`,
+    e.puissance != null && `puissance visée = ${pct(e.puissance)}`
+  ].filter(Boolean).map(c => `<span class="chip">${c}</span>`).join('');
+
+  const nInt = R.internes.length, nExt = R.externes.length, nEx = R.exclus.length, nAc = (R.a_completer || []).length;
+  const k = [[R.n_essais_examines, 'essais examinés'], [nInt + nExt, 'essais retenus'], [nEx, 'essais écartés'],
+             [nAc, 'fiches à compléter'], [e.evenements_min, 'événements requis']];
+  $('#kpis').innerHTML = k.map(([v, l]) => `<div class="kpi"><b>${v ?? '–'}</b><small>${l}</small></div>`).join('');
+
+  const total = R.n_essais_examines || 1;
+  const e1 = R.exclus.filter(x => x.etage === 1).length, e2 = R.exclus.filter(x => x.etage === 2).length;
+  const steps = [['Examinés', total, ''], ['Passent l\'étage 1', total - e1, 'l2'],
+                 ['Fiche complète', total - e1 - nAc, 'l3'], ['Retenus (étage 2)', nInt + nExt, 'l4']];
+  $('#funnel').innerHTML = steps.map(([l, n, c]) =>
+    `<div class="row"><span>${l}</span><div><div class="bar ${c}" style="width:${Math.max(0, n) / total * 100}%"></div></div><span class="n">${n}</span></div>`).join('');
+
+  if (t.evenements_essai_tous){
+    const mx = Math.max(t.evenements_essai_tous, t.evenements_essai_x_plus);
+    $('#gainsub').textContent = `Événements requis, formule de Schoenfeld (α ${pct(h.alpha)}, puissance ${pct(h.puissance)}).`;
+    $('#gain').innerHTML = `
+      <div class="gcol"><b>${t.evenements_essai_tous}</b><div class="g" style="height:${t.evenements_essai_tous / mx * 100}%"></div><small>Ouvert à tous<br>HR dilué ${fr(t.hr_dilue_tous)}</small></div>
+      <div class="gcol on"><b>${t.evenements_essai_x_plus}</b><div class="g" style="height:${t.evenements_essai_x_plus / mx * 100}%"></div><small>Réservé aux X⁺<br>HR ${fr(h.hr_x_plus)}</small></div>`;
+  }
+
+  const tabs = [['internes', 'Essais internes', nInt], ['externes', 'Essais externes', nExt],
+                ['exclus', 'Écartés', nEx], ['a_completer', 'À compléter', nAc]];
+  $('#tabs').innerHTML = tabs.map(([id, l, n]) =>
+    `<button role="tab" aria-selected="${tab === id}" class="${tab === id ? 'on' : ''}" data-t="${id}">${l}<span class="count">${n}</span></button>`).join('');
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
+  $('#view').innerHTML = tab === 'exclus' ? viewExclus() : tab === 'a_completer' ? viewAC() : viewRetenus(R[tab]);
+  document.querySelectorAll('.filters button').forEach(b => b.onclick = () => { filtre = +b.dataset.f; render(); });
+}
+
+function viewRetenus(list){
+  if (!list.length) return `<div class="empty">Aucun essai retenu dans cet index.</div>`;
+  return list.map((r, i) => {
+    const p = r.puissance_a_priori || {}, ev = p.evenements_attendus || {};
+    const src = Object.values(r.sources || {}).map(s => s.doc).filter(Boolean);
+    return `<article class="card">
+      <div class="head"><div><span class="rank">#${i + 1}</span><h3 style="display:inline">${esc(r.trial_id)}</h3>
+        <div class="meta">${esc(r.titre)} · ${esc(r.detenteur)}</div></div>
+        <div class="badges"><span class="badge ${esc(r.niveau_preuve_atteignable)}" title="Niveau de preuve atteignable">${esc(r.niveau_preuve_atteignable)}</span>
+        <span class="badge R" title="${esc(r.voie.explication)}">${esc(r.voie.code)}</span></div></div>
+      <div class="stats">
+        <div class="stat"><small>Puissance pour l'interaction</small><b>${pct(p.valeur || 0)}</b>
+          <div class="meter"><i style="width:${(p.valeur || 0) * 100}%"></i><span class="seuil" title="seuil 80 %"></span></div></div>
+        <div class="stat"><small>Événements attendus X⁺ / X⁻</small><b>${ev.x_plus ?? '–'} / ${ev.x_moins ?? '–'}</b></div>
+        <div class="stat"><small>Compatibilité · patients randomisés</small><b>${fr(r.score_compatibilite)} · ${r.effectif_randomise}</b></div>
+      </div>
+      <div class="meta">${esc(r.voie.explication)}</div>
+      <div class="gainlist">Gains : ${(r.gains || []).map(g => `<span title="${esc(g.libelle)}">${esc(g.code)}</span>`).join(' · ') || 'aucun'}</div>
+      <details><summary>Pourquoi ce verdict</summary>
+        <ul class="tight">${(r.ecarts || []).map(x => `<li class="ecart">${esc(x)}</li>`).join('') || '<li>Aucun écart aux exigences idéales.</li>'}</ul>
+        <ul class="tight">${(r.conditions_restantes || []).map(x => `<li>À faire : ${esc(x)}</li>`).join('')}</ul>
+        <ul class="tight"><li>Méthode : ${esc(p.methode)}</li><li>Sources : ${esc(src.join(', ') || '–')}</li></ul>
+      </details></article>`;
+  }).join('');
+}
+
+function viewExclus(){
+  const rows = R.exclus.filter(x => !filtre || x.etage === filtre);
+  return `<div class="filters">${[[0, 'Tous'], [1, 'Étage 1'], [2, 'Étage 2']].map(([f, l]) =>
+      `<button data-f="${f}" class="${filtre === f ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <table><thead><tr><th>Essai</th><th>Étage</th><th>Raison</th></tr></thead><tbody>
+    ${rows.map(x => `<tr><td class="mono">${esc(x.trial_id)}</td><td>${x.etage}</td><td>${esc(x.raisons.join(' ; '))}<div class="meta">${esc(x.titre)}</div></td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+function viewAC(){
+  const l = R.a_completer || [];
+  if (!l.length) return `<div class="empty">Toutes les fiches sont complètes.</div>`;
+  return `<table><thead><tr><th>Essai</th><th>Champs manquants</th></tr></thead><tbody>
+    ${l.map(x => `<tr><td class="mono">${esc(x.trial_id)}</td><td>${esc((x.champs_manquants || []).join(', '))}<div class="meta">${esc(x.titre)}</div></td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+function charger(obj){
+  const need = ['internes', 'externes', 'exclus'];
+  if (!obj || need.some(k => !Array.isArray(obj[k]))) throw new Error('Ce fichier ne ressemble pas à un résultat de matcher.py.');
+  R = obj; tab = obj.internes.length ? 'internes' : obj.externes.length ? 'externes' : (obj.a_completer || []).length ? 'a_completer' : 'exclus';
+  $('#err').style.display = 'none'; render();
+}
+$('#file').onchange = ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  f.text().then(t => charger(JSON.parse(t))).catch(e => { $('#err').textContent = e.message; $('#err').style.display = 'block'; });
+};
+$('#demo').onclick = () => charger(DEMO);
+render();
+</script>
+</body>
+</html>

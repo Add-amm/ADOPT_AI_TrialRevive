@@ -1,0 +1,26 @@
+Hypothèse SEH-KRAS-2009 v1 : Le statut KRAS sauvage de la tumeur prédit le bénéfice d'un anti-EGFR par rapport à un contrôle sans anti-EGFR, en survie sans progression, dans le cancer colorectal métastatique.
+Exigence : 206 événements pour l'interaction
+8 essais examinés
+
+== Essais internes retenus (1)
+1. FICTIF-INT-01 | E3 | R2 | score 1.0 | puissance 97% | Panitumumab + soins de support vs soins de support seuls
+
+== Essais externes retenus (2)
+1. FICTIF-EXT-02 | E2 | R2 | score 0.56 | puissance 96% | Cétuximab vs soins de support
+     - molécule cetuximab au lieu de panitumumab (même classe) : score 0.8, niveau plafonné à E3 tant qu'une réplication avec la molécule exacte manque
+     - couverture prévue 69%, entre 60% et 80% : niveau plafonné à E2
+     - portée du consentement inconnu : à vérifier chez le détenteur (score 0.7)
+2. FICTIF-EXT-07 | E2 | R2 | score 0.48 | puissance 96% | Cétuximab + FOLFOX vs FOLFOX, critère taux de réponse
+     - molécule cetuximab au lieu de panitumumab (même classe) : score 0.8, niveau plafonné à E3 tant qu'une réplication avec la molécule exacte manque
+     - critère substitué (ORR) : niveau plafonné à E2 ; puissance calculée comme pour un critère de survie, donc approximative
+
+== Essais écartés (5)
+- FICTIF-EXT-03 (étage 1) : pas de groupe contrôle tiré au sort
+- FICTIF-EXT-04 (étage 1) : essai débuté le 2010-06-01, après la date de l'hypothèse (2009-01-01)
+- FICTIF-EXT-05 (étage 2) : tissu prévu seulement dans le(s) bras cetuximab, pas dans controle : interaction non testable
+- FICTIF-EXT-06 (étage 2) : puissance a priori pour l'interaction 42% < 80% (environ 82 événements attendus)
+- FICTIF-EXT-08 (étage 1) : le bras contrôle reçoit déjà un anti-EGFR
+
+Essai de confirmation : 149 événements ouvert à tous (HR dilué 0.632) contre 50 réservé aux X+
+
+Résultat complet : resultat_appariement.json
