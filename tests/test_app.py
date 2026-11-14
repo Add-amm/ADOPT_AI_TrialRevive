@@ -66,3 +66,46 @@ def test_ui_has_no_emoji():
     src = Path(APP_UI).read_text(encoding="utf-8")
     emojis = [c for c in src if ord(c) >= 0x1F300 and ord(c) <= 0x1FAFF]
     assert not emojis, f"emojis restants : {set(emojis)}"
+
+
+def test_ui_comparison_selects_each_record_and_preserves_full_answer(monkeypatch):
+    from src import compare, question
+
+    records = [{"question": question.CAS_VEDETTE_TEXTE, "reponse_ia": "A" * 800 + "FIN REPONSE",
+                "modele": "Test A", "date": "2026-11-14"},
+               {"question": "Autre question", "reponse_ia": "Seconde réponse",
+                "modele": "Test B", "date": "2026-11-14"}]
+    monkeypatch.setattr(compare, "load_baselines", lambda directory: (records, ["invalide.json : erreur de test"]))
+    at = AppTest.from_file(APP_UI, default_timeout=30).run()
+    _btn(at, "Cas de démo").click().run()
+    _btn(at, "Comparaison").click().run()
+    assert not at.exception
+    assert at.text_area[1].value.endswith("FIN REPONSE")
+    assert "invalide.json" in at.warning[0].value
+    at.selectbox[0].select(1).run()
+    assert not at.exception and at.text_area[1].value == "Seconde réponse"
+    assert any("diffère" in w.value for w in at.warning)
+
+
+def test_dashboard_demo_without_network(monkeypatch):
+    import socket
+
+    def no_network(*args, **kwargs):
+        raise AssertionError("Appel réseau pendant la démo hors ligne")
+    monkeypatch.setattr(socket.socket, "connect", no_network)
+    at = AppTest.from_file(APP_UI, default_timeout=10).run()
+    _btn(at, "Cas de démo").click().run()
+    assert not at.exception and not at.error
+    assert "252" in _html(at)
+
+
+def test_ui_other_treatment_explains_missing_internal_arm():
+    at = AppTest.from_file(APP_UI, default_timeout=30).run()
+    at.text_area[0].set_value("Le statut KRAS change-t-il l'effet du cetuximab ?").run()
+    _btn(at, "Analyser").click().run()
+    assert not at.exception and not at.error
+    _btn(at, "Patients").click().run()
+    assert not at.exception
+    assert any("aucun bras cetuximab" in c.value for c in at.caption)
+    _btn(at, "Dossier").click().run()
+    assert not at.exception and "INDÉTERMINÉ" in _html(at)
