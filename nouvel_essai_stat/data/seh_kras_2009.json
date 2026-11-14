@@ -1,0 +1,177 @@
+{
+  "seh_id": "SEH-KRAS-2009",
+  "version": 1,
+  "statut": "brouillon",
+  "valide_par": null,
+  "type_hypothese": "predictive",
+  "enonce": "Le statut KRAS sauvage de la tumeur prédit le bénéfice d'un anti-EGFR par rapport à un contrôle sans anti-EGFR, en survie sans progression, dans le cancer colorectal métastatique.",
+  "date_hypothese": "2009-01-01",
+  "source": {
+    "doc": "Amado et al., J Clin Oncol 2008",
+    "passage": "A VERIFIER : HR et prévalence à relire dans l'article"
+  },
+  "biomarqueur_x": "KRAS sauvage",
+  "effets_attendus": {
+    "hr_x_plus": 0.45,
+    "hr_x_moins": 0.99,
+    "prevalence_x": 0.57
+  },
+  "exigence_statistique": {
+    "alpha": 0.05,
+    "puissance": 0.8
+  },
+  "contraintes": [
+    {
+      "champ": "indication",
+      "niveau": "obligatoire",
+      "valeur": {
+        "inclut": [
+          "colorectal",
+          "colon",
+          "rectal",
+          "rectum"
+        ],
+        "stade": "metastatique"
+      }
+    },
+    {
+      "champ": "date_debut",
+      "niveau": "obligatoire",
+      "valeur": {
+        "avant": "2009-01-01"
+      },
+      "explication": "état du monde figé à la date de l'hypothèse"
+    },
+    {
+      "champ": "comparateur",
+      "niveau": "obligatoire",
+      "valeur": {
+        "randomise": true,
+        "exclut_classe": "anti-EGFR"
+      }
+    },
+    {
+      "champ": "traitement",
+      "niveau": "tolere",
+      "ideal": {
+        "molecules": [
+          "panitumumab"
+        ]
+      },
+      "tolere": {
+        "classe": "anti-EGFR"
+      },
+      "table_substitution": {
+        "panitumumab": 1.0,
+        "cetuximab": 0.8
+      },
+      "plafond_preuve": "E3",
+      "regle": "TOL-MOLECULE-v1",
+      "explication": "molécule différente de la même classe : réplication avec la molécule exacte avant E4"
+    },
+    {
+      "champ": "critere",
+      "niveau": "tolere",
+      "ideal": {
+        "valeurs": [
+          "PFS"
+        ]
+      },
+      "tolere": {
+        "valeurs": [
+          "OS"
+        ]
+      },
+      "substitut": {
+        "valeurs": [
+          "ORR"
+        ],
+        "score": 0.6,
+        "plafond_preuve": "E2"
+      },
+      "table_substitution": {
+        "PFS": 1.0,
+        "OS": 0.9
+      },
+      "plafond_preuve": null,
+      "regle": "TOL-CRITERE-v1"
+    },
+    {
+      "champ": "materiel",
+      "niveau": "obligatoire",
+      "valeur": {
+        "types": [
+          "tissu_tumoral_fixe"
+        ]
+      },
+      "explication": "le statut KRAS se mesure sur tissu tumoral fixé (bloc FFPE)"
+    },
+    {
+      "champ": "instant",
+      "niveau": "tolere",
+      "ideal": {
+        "ancrage": "premiere_dose",
+        "intervalle_j": [
+          -3650,
+          -1
+        ]
+      },
+      "tolere": {
+        "ancrage": "premiere_dose",
+        "intervalle_j": [
+          -3650,
+          30
+        ]
+      },
+      "fonction_tolerance": {
+        "type": "lineaire_distance",
+        "limite_j": 30
+      },
+      "plafond_preuve": null,
+      "regle": "TOL-TEMPS-TISSU-v1",
+      "explication": "le statut KRAS est stable : un tissu archivé ancien convient, idéalement avant traitement"
+    },
+    {
+      "champ": "presence_deux_bras",
+      "niveau": "obligatoire",
+      "valeur": true
+    },
+    {
+      "champ": "couverture",
+      "niveau": "tolere",
+      "ideal": {
+        "min": 0.8
+      },
+      "tolere": {
+        "min": 0.6
+      },
+      "plafond_preuve": "E2",
+      "regle": "TOL-COUV-v1"
+    },
+    {
+      "champ": "consentement",
+      "niveau": "tolere",
+      "ideal": {
+        "valeurs": [
+          "biomarqueurs"
+        ]
+      },
+      "tolere": {
+        "valeurs": [
+          "optionnel",
+          "inconnu",
+          "restreint"
+        ]
+      },
+      "table_substitution": {
+        "biomarqueurs": 1.0,
+        "optionnel": 0.85,
+        "inconnu": 0.7,
+        "restreint": 0.4
+      },
+      "plafond_preuve": null,
+      "regle": "TOL-CONSENT-v1",
+      "explication": "portée inconnue : signalée, à vérifier chez le détenteur"
+    }
+  ]
+}
