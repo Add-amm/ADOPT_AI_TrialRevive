@@ -38,7 +38,7 @@ On peut aussi laisser `DATABASE_URL` vide et renseigner uniquement **`PGPASSWORD
 | Port | `5432` |
 | Base | `postgres` |
 | Utilisateur | `postgres` |
-| Schéma / table / colonne | `public.trials.json` |
+| Schéma / table / colonne | `trialstd.trials.json` |
 
 La table et la colonne sont le **schéma attendu d'après l'adaptateur existant**, pas une découverte de la base distante. Les variables `PG_TRIALS_SCHEMA`, `PG_TRIALS_TABLE` et `PG_TRIALS_JSON_COLUMN` permettent de les changer. La colonne doit contenir un objet JSON/JSONB standardisé (schéma 1.0 : `identity`, `design`, `samples`, etc.), ou un texte JSON représentant cet objet. Ce n'est pas un connecteur universel pour n'importe quel schéma relationnel.
 
@@ -53,7 +53,7 @@ python matcher.py data/seh_kras_2009.json --corpus kras --sortie outputs/resulta
 python adaptateur_base.py --corpus kras --sortie outputs/fiches_base.json
 ```
 
-Le résultat par défaut est `outputs/resultat_appariement.json`, indépendant du répertoire d'appel. Aucun export de toutes les tables n'est nécessaire. Le connecteur ne lit que la colonne configurée, par lots de 500, dans une transaction **READ ONLY**, avec un délai de connexion de 10 secondes et un délai de requête de 30 secondes. TLS utilise `verify-full` et les autorités de certification de `certifi`, ou le certificat indiqué par `PGSSLROOTCERT`. Ne pas désactiver la vérification en cas d'erreur de certificat.
+Le résultat par défaut est `outputs/resultat_appariement.json`, indépendant du répertoire d'appel. Aucun export de toutes les tables n'est nécessaire. Le connecteur ne lit que la colonne configurée, par lots de 500, dans une transaction **READ ONLY**, avec un délai de connexion de 10 secondes et un délai de requête de 30 secondes. TLS utilise `verify-full` : pour les domaines Supabase, la CA publique fournie dans `certs/supabase-prod-ca-2021.crt` est utilisee (la CA privee du pooler est absente de `certifi`). Les autres hotes utilisent `certifi`. Un `sslrootcert` explicite dans `DATABASE_URL` est prioritaire sur `PGSSLROOTCERT`, puis sur la CA par defaut. Le chemin de la CA incluse est independant du repertoire de lancement ; aucun telechargement au demarrage. Ne pas desactiver la verification en cas d'erreur de certificat. La provenance et le SHA-256 du certificat sont documentes dans `certs/README.md`.
 
 Un secret manquant, une erreur de connexion ou une table/colonne inconnue arrête la commande avec un message lisible. **Aucun basculement silencieux vers les huit fiches fictives n'est effectué.** Les erreurs publiques ne contiennent ni URI, ni mot de passe, ni contenu d'une ligne. Les variables de l'environnement ont priorité sur les fichiers `.env` locaux.
 
@@ -81,12 +81,13 @@ python matcher.py data/seh_kras_2009.json data/fiches_ctgov.json
 
 Les exemples fictifs restent des données de test choisies explicitement. Les interfaces HTML de ce dossier affichent un résultat JSON déjà calculé ; elles n'ouvrent jamais elles-mêmes une connexion PostgreSQL et ne doivent recevoir aucun mot de passe. Charger le résultat `outputs/resultat_appariement.json` pour afficher une analyse issue de la base. Les autres dossiers du projet, dont `src/` et le serveur web principal, ne sont pas modifiés par ce changement.
 
-### Vérifications de cette modification
+### Verification du correctif TLS
 
-- Dans `nouvel_essai_stat` : **40 tests réussis** (les 22 tests existants et 18 tests de source/CLI). Les règles et formules statistiques sont inchangées ; mêmes résultats sur les mêmes fiches, que la lecture soit simulée depuis PostgreSQL ou effectuée depuis un fichier.
-- Tests du projet principal, lancés séparément depuis la racine avec `python -m pytest -q tests/` : **79 tests réussis**.
-- La tentative de connexion au serveur Supabase avec le client PostgreSQL est bloquée dans l'environnement cloud par la résolution DNS du nom du serveur. **Connexion authentifiée, structure réelle de la table et résultat distant non validés.** Aucun contenu de la base distante n'a été lu ou exporté.
-- Le mot de passe communiqué n'est pas enregistré dans le dépôt ; il doit être fourni par `DATABASE_URL` ou `PGPASSWORD` au moment de l'exécution. N'utiliser que les données d'essais publiques ou fictives prévues pour ce projet.
+- Depuis `nouvel_essai_stat`, `python -X utf8 -m pytest -q` : **52 tests reussis**, dont 12 nouveaux cas de regression TLS. Le mode UTF-8 permet aux anciens tests de lire leurs fixtures correctement sous Windows.
+- Connexion authentifiee au pooler Supabase avec la CA incluse et `sslmode=verify-full` : **reussie**. TLS actif, transaction en lecture seule et `SELECT 1` verifies.
+- Test negatif avec le bundle `certifi` seul : certificat rejete, sans repli TLS non verifie.
+- Le schema confirme est `trialstd` : lecture de `trialstd.trials.json` et conversion par l'adaptateur verifiees, sans export du corpus.
+- Aucun secret ni fichier `.env` modifie. Aucun contenu de ligne affiche ou exporte.
 
 Les essais du registre passent l'étage 1 puis tombent dans « à compléter » : le registre
 ne donne ni les prélèvements, ni la couverture, ni le taux d'événements, ni le consentement.

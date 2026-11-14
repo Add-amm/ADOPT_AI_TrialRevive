@@ -10,6 +10,7 @@ from pathlib import Path
 
 HOTE_DEFAUT = "db.rnlfbeksplyoywweoddo.supabase.co"
 RACINE = Path(__file__).resolve().parent
+CA_SUPABASE = RACINE / "certs" / "supabase-prod-ca-2021.crt"
 
 
 class ErreurPostgres(RuntimeError):
@@ -43,7 +44,12 @@ def options_connexion(environ=None):
                              "nouvel_essai_stat/.env (ignoré par Git). Aucun mot de passe n'est fourni par défaut.")
     # Ne jamais faire de repli TLS non vérifié, même si l'URI le demande.
     opts["sslmode"] = "verify-full"
-    opts.setdefault("sslrootcert", env.get("PGSSLROOTCERT") or certifi.where())
+    # Le pooler Supabase est signe par une CA privee absente de certifi.
+    # Ne faire confiance a cette CA que pour les domaines Supabase attendus.
+    hosts = [host.lower().rstrip(".") for host in opts["host"].split(",")]
+    supabase = all(host.endswith((".supabase.co", ".pooler.supabase.com")) for host in hosts)
+    ca_defaut = str(CA_SUPABASE) if supabase else certifi.where()
+    opts.setdefault("sslrootcert", env.get("PGSSLROOTCERT") or ca_defaut)
     opts["connect_timeout"] = 10
     opts["application_name"] = "trialrevive-stat-lecture"
     return opts
@@ -68,6 +74,11 @@ def connexion_lecture_seule():
                        "PG_TRIALS_TABLE et PG_TRIALS_JSON_COLUMN.")
         elif code in ("28P01", "28000", "42501"):
             message = "Authentification ou droits de lecture PostgreSQL refusés."
+        elif "certificate verify failed" in str(exc).lower():
+            message = ("Verification du certificat TLS PostgreSQL impossible. "
+                       "Verifiez la CA configuree par sslrootcert dans DATABASE_URL ou PGSSLROOTCERT ; "
+                       "pour Supabase, utilisez la CA fournie dans Database Settings. "
+                       "La verification TLS reste obligatoire.")
         else:
             message = ("Connexion ou lecture PostgreSQL impossible. Vérifiez le réseau, l'hôte, "
                        "les identifiants et le certificat TLS ; aucun repli vers des données fictives n'est effectué.")
@@ -79,7 +90,7 @@ def lire_postgres(*, schema=None, table=None, colonne=None):
     from psycopg import sql
 
     charger_environnement()
-    schema = schema or os.getenv("PG_TRIALS_SCHEMA", "public")
+    schema = schema or os.getenv("PG_TRIALS_SCHEMA", "trialstd")
     table = table or os.getenv("PG_TRIALS_TABLE", "trials")
     colonne = colonne or os.getenv("PG_TRIALS_JSON_COLUMN", "json")
     requete = sql.SQL("SELECT {colonne} FROM {schema}.{table}").format(

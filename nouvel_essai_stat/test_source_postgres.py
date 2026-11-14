@@ -185,3 +185,58 @@ def test_legacy_fictitious_file_cli_is_unchanged(tmp_path, monkeypatch):
     out = tmp_path / "legacy.json"
     matcher.main([str(seh), str(fiches), str(out)])
     assert json.loads(out.read_text()) == matcher.apparier(json.loads(seh.read_text()), json.loads(fiches.read_text()))
+
+
+@pytest.mark.parametrize("host", [pg.HOTE_DEFAUT, "aws-1-eu-west-1.pooler.supabase.com",
+                                  "aws-1-eu-west-1.pooler.supabase.co",
+                                  "AWS-1-EU-WEST-1.POOLER.SUPABASE.COM."])
+def test_supabase_uses_bundled_ca_from_any_working_directory(host, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    opts = pg.options_connexion({"PGHOST": host, "PGPASSWORD": "fixture-only"})
+    assert opts["sslrootcert"] == str(pg.CA_SUPABASE)
+    assert pg.CA_SUPABASE.is_absolute() and pg.CA_SUPABASE.is_file()
+    assert opts["sslmode"] == "verify-full"
+
+
+@pytest.mark.parametrize("host", ["database.example", "supabase.co.evil.example",
+                                  "fakepooler.supabase.com", "db.supabase.co,database.example"])
+def test_other_hosts_keep_public_ca_bundle(host):
+    import certifi
+    opts = pg.options_connexion({"PGHOST": host, "PGPASSWORD": "fixture-only"})
+    assert opts["sslrootcert"] == certifi.where()
+
+
+def test_custom_ca_from_environment_is_preserved():
+    opts = pg.options_connexion({"PGPASSWORD": "fixture-only", "PGSSLROOTCERT": "/custom/ca.pem"})
+    assert opts["sslrootcert"] == "/custom/ca.pem"
+
+
+def test_url_ca_takes_precedence_over_environment():
+    opts = pg.options_connexion({
+        "DATABASE_URL": "postgresql://reader:fixture-only@aws-1-eu-west-1.pooler.supabase.com/postgres?sslrootcert=url-ca.pem&sslmode=disable",
+        "PGSSLROOTCERT": "env-ca.pem",
+    })
+    assert opts["sslrootcert"] == "url-ca.pem"
+    assert opts["sslmode"] == "verify-full"
+
+
+def test_bundled_ca_integrity_and_format():
+    import hashlib
+    import ssl
+    ca = pg.CA_SUPABASE.read_bytes()
+    assert hashlib.sha256(ca).hexdigest() == "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"
+    context = ssl.create_default_context(cadata=ca.decode("ascii"))
+    assert context.check_hostname and context.verify_mode == ssl.CERT_REQUIRED
+
+
+def test_certificate_failure_has_actionable_redacted_diagnostic(monkeypatch):
+    monkeypatch.setattr(pg, "charger_environnement", lambda: None)
+    monkeypatch.setattr(pg, "options_connexion", lambda: {})
+    def unavailable(**kwargs):
+        raise psycopg.OperationalError("SSL error: certificate verify failed password=private-fixture")
+    monkeypatch.setattr(psycopg, "connect", unavailable)
+    with pytest.raises(pg.ErreurPostgres) as err:
+        with pg.connexion_lecture_seule():
+            pytest.fail("A failed TLS handshake must not open a connection")
+    assert "PGSSLROOTCERT" in str(err.value)
+    assert "private-fixture" not in str(err.value)

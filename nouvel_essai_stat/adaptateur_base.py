@@ -1,6 +1,6 @@
 """Transforme la base standardisée de l'équipe (schéma 1.0) en fiches d'essai pour matcher.py.
 
-Entrée par défaut : PostgreSQL, table public.trials, colonne json (configurables).
+Entrée par défaut : PostgreSQL, table trialstd.trials, colonne json (configurables).
 Alternatives explicites : export CSV, fichier .jsonl ou corpus .jsonl.gz.
 
 Usage :
