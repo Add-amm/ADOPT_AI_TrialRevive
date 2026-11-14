@@ -64,3 +64,4 @@ Veille automatique de littérature et notifications push, horloge commune des da
 - Préparé le dossier de revue des six articles, les liens DOI et les limites de la validation.
 - Corrigé les résultats trompeurs sur les marqueurs non disponibles et sur un traitement absent de l'essai interne.
 - Préparé les cinq diapositives, le pitch à jour et l'export de secours ; contrôles automatiques ci-dessus. Restes humains conservés ouverts.
+- Front du site (`web/`) remplacé par la version `nouveau-front` de la fork CBUM05-dev (commit `efd42e7` : vert médical, Manrope, logo officiel, coins droits, sans 3D), avec sa charte (`docs/charte/`) et ses garde-fous (`tests/test_charte.py`). Backend inchangé (`server.py`, `web_adapter.py`, `src/`). **84 tests réussis**, dont le parcours navigateur ; les huit pages sont identiques au pixel près à celles de la fork. Détails : `docs/INTEGRATION_FRONT.md`.
