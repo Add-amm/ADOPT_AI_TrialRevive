@@ -1,9 +1,10 @@
 """Transforme la base standardisée de l'équipe (schéma 1.0) en fiches d'essai pour matcher.py.
 
-Entrées acceptées :
-    un export CSV de la table `trials` (colonne `json`), un fichier .jsonl ou un corpus .jsonl.gz
+Entrée par défaut : PostgreSQL, table trialstd.trials, colonne json.
+Alternatives explicites : export CSV, fichier .jsonl ou corpus .jsonl.gz.
 
 Usage :
+    python3 adaptateur_base.py --sortie outputs/fiches_base.json
     python3 adaptateur_base.py trials_rows.csv --sortie data/fiches_base.json
     python3 adaptateur_base.py corpus.jsonl.gz --corpus kras --sortie data/fiches_base.json
     python3 matcher.py data/seh_kras_2009.json data/fiches_base.json resultat_base.json
@@ -17,6 +18,9 @@ import csv
 import gzip
 import json
 import re
+from pathlib import Path
+
+from source_postgres import ErreurPostgres, lire_postgres
 
 # --- paramètres par défaut, à valider ------------------------------------------------
 COUVERTURE_DEFAUT = [0.60, 0.90]                 # part de patients avec échantillon exploitable
@@ -33,14 +37,19 @@ CRITERES = [(re.compile(r"pfs|progression", re.I), "PFS"), (re.compile(r"\bos\b|
             (re.compile(r"orr|response", re.I), "ORR")]
 
 
-def lire(chemin):
+def lire(chemin=None):
+    if chemin is None:
+        yield from lire_postgres()
+        return
+    chemin = str(chemin)
     if chemin.endswith(".csv"):
         csv.field_size_limit(10 ** 9)
-        for r in csv.DictReader(open(chemin, newline="")):
-            yield json.loads(r["json"])
+        with open(chemin, newline="", encoding="utf-8-sig") as f:
+            for r in csv.DictReader(f):
+                yield json.loads(r["json"])
     else:
         ouvrir = gzip.open if chemin.endswith(".gz") else open
-        with ouvrir(chemin, "rt") as f:
+        with ouvrir(chemin, "rt", encoding="utf-8-sig") as f:
             for ligne in f:
                 if ligne.strip():
                     yield json.loads(ligne)
@@ -146,24 +155,38 @@ def vers_fiche(j):
     }
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("entree")
-    ap.add_argument("--corpus", help="ne garder que les lignes dont le corpus contient ce texte")
-    ap.add_argument("--sortie", default="data/fiches_base.json")
-    a = ap.parse_args()
-    fiches, vus = [], set()
-    for j in lire(a.entree):
+def charger_fiches(entree=None, corpus=None):
+    """Convertit les lignes sans dédoublonner : VF_stats choisit la fiche la plus complète."""
+    fiches = []
+    for j in lire(entree):
         if j.get("record_type") not in (None, "trial"):
             continue
-        f = vers_fiche(j)
-        if a.corpus and a.corpus.lower() not in str(f["corpus"]).lower():
+        fiche = vers_fiche(j)
+        if corpus and corpus.lower() not in str(fiche["corpus"]).lower():
             continue
+        fiches.append(fiche)
+    return fiches
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("entree", nargs="?", help="CSV/JSONL explicite ; sinon PostgreSQL")
+    ap.add_argument("--corpus", help="ne garder que les lignes dont le corpus contient ce texte")
+    ap.add_argument("--sortie", type=Path, default=Path(__file__).resolve().parent / "outputs" / "fiches_base.json")
+    a = ap.parse_args(argv)
+    fiches, vus = [], set()
+    try:
+        chargees = charger_fiches(a.entree, a.corpus)
+    except (ErreurPostgres, OSError, ValueError) as exc:
+        ap.exit(1, f"Chargement impossible : {exc}\n")
+    # Conserver le dédoublonnage historique de l'export explicite de fiches.
+    for f in chargees:
         if (f["trial_id"], f["corpus"] if not a.corpus else None) in vus:
             continue
         vus.add((f["trial_id"], f["corpus"] if not a.corpus else None))
         fiches.append(f)
-    json.dump(fiches, open(a.sortie, "w"), ensure_ascii=False, indent=1)
+    a.sortie.parent.mkdir(parents=True, exist_ok=True)
+    a.sortie.write_text(json.dumps(fiches, ensure_ascii=False, indent=1), encoding="utf-8")
     n_eff = sum(f["effectif_randomise"] is not None for f in fiches)
     n_tissu = sum(f["prelevements"] is not None for f in fiches)
     n_bras = sum(f["bras"] is not None for f in fiches)
