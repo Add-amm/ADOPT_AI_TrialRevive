@@ -296,3 +296,30 @@ def test_cible_inconnue_repli_sur_la_classe(seh):
     f["traitement"]["classe"] = "anti-VEGF"
     r = matcher.apparier(seh, [f])
     assert r["exclus"] and "pas de anti-EGFR étudié" in r["exclus"][0]["raisons"][0]
+
+
+# --- corrections après le test sur la base complète (14 nov., 23 h)
+def test_cibles_chembl_en_dict_lues_par_symbole(seh):
+    # la base donne interventions[].targets sous forme de dict ChEMBL
+    rec = _rec("NCT_K1", 900)
+    rec["interventions"] = [{"name": "panitumumab", "kind": "biological",
+                             "targets": [{"SYMBOL": "EGFR", "HGNC": "HGNC:3236", "SOURCE": "CHEMBL"}]}]
+    f = adaptateur_base.vers_fiche(rec)
+    assert f["cibles"] == ["EGFR"]
+    assert matcher.apparier(seh, [f])["externes"]
+
+
+def test_cibles_de_la_chimio_de_fond_ignorees(seh):
+    # FOLFOX commun aux deux bras : sa cible (TYMS) ne doit pas s'ajouter à celle du médicament étudié
+    rec = _rec("NCT_K2", 900)
+    rec["interventions"] = [
+        {"name": "panitumumab", "kind": "biological", "targets": [{"SYMBOL": "EGFR"}]},
+        {"name": "fluorouracil", "kind": "drug", "targets": [{"SYMBOL": "TYMS"}]}]
+    assert adaptateur_base.vers_fiche(rec)["cibles"] == ["EGFR"]
+
+
+def test_not_started_ignore_si_enregistre_apres_la_date_de_l_hypothese(seh):
+    f = adaptateur_base.vers_fiche(_rec("NCT_K3", 900))
+    f["date_debut"], f["first_posted"], f["statut_a_la_coupure"] = "2015-01-01", "2014-11-01", "not_started"
+    r = matcher.apparier(seh, [f])
+    assert not r["en_cours"] and r["exclus"]

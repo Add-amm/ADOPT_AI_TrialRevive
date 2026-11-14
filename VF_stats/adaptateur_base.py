@@ -36,8 +36,15 @@ CIBLES_CONNUES = {"cetuximab": "EGFR", "panitumumab": "EGFR", "gefitinib": "EGFR
                   "evolocumab": "PCSK9", "alirocumab": "PCSK9", "clopidogrel": "P2Y12"}
 
 
+def symbole_cible(c):
+    """La base donne des cibles ChEMBL sous forme de dict ({'SYMBOL': 'EGFR', 'HGNC': ...}) : on garde le symbole."""
+    if isinstance(c, dict):
+        return c.get("SYMBOL") or c.get("symbol") or c.get("gene")
+    return c
+
+
 def cibles_de(mols, cibles_base=()):
-    out = {str(c).upper() for c in cibles_base if c}
+    out = {str(symbole_cible(c)).upper() for c in cibles_base if symbole_cible(c)}
     for m in mols or []:
         for mol, cible in CIBLES_CONNUES.items():
             if mol in str(m).lower():
@@ -99,7 +106,11 @@ def vers_fiche(j):
            [str(d).lower() for b in bras if b["type"] == "EXPERIMENTAL" for d in b["interventions"]] or \
            [i.get("name", "").lower() for i in j.get("interventions") or [] if i.get("kind") in (None, "drug", "biological")]
     cl_exp = classes_de(mols, contrast.get("differential_classes"))
-    cibles_base = [t for i in j.get("interventions") or [] for t in (i.get("targets") or [])]
+    # cibles des seules molécules qui diffèrent entre les bras (pas la chimio de fond, commune aux bras)
+    interv = j.get("interventions") or []
+    diff = [i for i in interv if any(str(m) and (str(m) in str(i.get("name", "")).lower()
+                                                 or str(i.get("name", "")).lower() in str(m)) for m in mols)]
+    cibles_base = [t for i in (diff or interv) for t in (i.get("targets") or [])]
     cl_ctrl = sorted({c for b in bras if b["type"] != "EXPERIMENTAL" for c in b["classes"]})
 
     stade = STADE.get(ind.get("setting"))

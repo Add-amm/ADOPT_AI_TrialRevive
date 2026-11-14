@@ -102,7 +102,7 @@ def etage1(seh, f):
         avant = c["valeur"]["avant"]
         tard = f["date_debut"] >= avant
         enregistre_avant = (f.get("first_posted") or "9999-12-31") < avant
-        if f.get("statut_a_la_coupure") == "not_started" or (tard and enregistre_avant):
+        if enregistre_avant and (tard or f.get("statut_a_la_coupure") == "not_started"):
             f["_en_cours"] = (f"pas encore commencé à la date de l'hypothèse ({avant}) : pas "
                               "d'échantillons archivés à réanalyser ; à suivre, une analyse "
                               "prospective peut y être greffée")
@@ -142,7 +142,8 @@ def etage1(seh, f):
     classe = c["tolere"]["classe"] if c else None
     ct = contrainte(seh, "cible")
     cibles_requises = {x.upper() for x in ct["valeur"]["cibles"]} if ct else set()
-    cibles_fiche = {str(x).upper() for x in f.get("cibles") or []}
+    cibles_fiche = {str(x.get("SYMBOL") if isinstance(x, dict) else x).upper()
+                    for x in f.get("cibles") or [] if x}
     if ct and cibles_fiche:
         if not (cibles_requises & cibles_fiche):
             raisons.append(f"la molécule étudiée ne vise pas {'/'.join(sorted(cibles_requises))} "

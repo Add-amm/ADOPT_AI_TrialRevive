@@ -15,3 +15,9 @@
 - Champ `cibles` ajouté aux fiches par les deux adaptateurs (`interventions[].targets` + molécules connues).
 - TKI anti-EGFR (géfitinib, erlotinib) tolérés : score 0,4, plafond E2 — valeurs à faire valider (biologiste / chirurgienne).
 - 49 tests réussis : 46 existants et 3 nouveaux. Aucun changement sur la démo fictive ni sur l'entrée PostgreSQL.
+
+## Corrections après le test sur la base complète (14 nov., 23 h)
+- Cibles ChEMBL : la base donne `interventions[].targets` en dict ; l'adaptateur lisait le dict entier au lieu du `SYMBOL`, si bien qu'aucune cible ne valait « EGFR » (vandétanib écarté à tort, messages illisibles). Corrigé.
+- Seules les cibles des molécules qui diffèrent entre les bras comptent (la chimio de fond n'ajoute plus TYMS, TOP1…).
+- `status_at_cutoff = not_started` se réfère à la coupure du corpus : il ne place un essai « en cours » que s'il était enregistré avant la date de l'hypothèse (NCT02291289, enregistré en 2014, n'y figure plus).
+- 52 tests réussis (49 + 3).
