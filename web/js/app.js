@@ -1,4 +1,5 @@
-import { ILLUSTRATION, ART } from "./illustration.js";
+import { ART } from "./illustration.js";
+import { cellsAnimation } from "./cells.js";
 
 /* ================= utilitaires ================= */
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -209,7 +210,7 @@ function landing() {
   return h("section", { class: "home", "aria-labelledby": "h1" },
     h("div", { class: "home-top" },
       h("div", {}, h("h1", { id: "h1" }, "Trouvez les essais qui peuvent répondre à votre question"), h("p", { class: "lede" }, "Une question entre. Un dossier de faisabilité sort.")),
-      h("div", { class: "illus", html: ILLUSTRATION })),
+      h("div", { class: "illus" }, cellsAnimation())),
     h("div", { class: "finder" }, form, list),
     h("p", { class: "home-note" }, "Essais publics de ClinicalTrials.gov. Patients de l'essai interne fictifs.",
       state.dossier && [" ", h("a", { href: "#/apercu" }, "Revenir au dernier dossier")]),

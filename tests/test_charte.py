@@ -2,13 +2,15 @@
 
 Écart assumé à la charte : un accent « vert médical » (et de l'ambre pour les alertes) s'ajoute à la palette grise,
 parce que le tout gris était jugé trop sombre pour un produit de santé. Cet écart est listé ci-dessous et nulle part ailleurs.
-Restent interdits : ombres, dégradés, coins arrondis, effets 3D, autres polices que Manrope, ressources distantes.
+Second écart assumé : l'animation de l'accueil (web/js/cells.js) utilise des dégradés radiaux SVG et des transparences
+pour l'effet « verre », à la demande de l'équipe. Ses couleurs restent celles de la liste ; le CSS reste sans dégradé.
+Restent interdits (hors cette exception) : ombres, dégradés, coins arrondis, effets 3D, autres polices que Manrope, ressources distantes.
 """
 import re
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parent.parent / "web"
-FILES = [WEB / "css" / "app.css", WEB / "js" / "app.js", WEB / "js" / "illustration.js", WEB / "index.html"]
+FILES = [WEB / "css" / "app.css", WEB / "js" / "app.js", WEB / "js" / "illustration.js", WEB / "js" / "cells.js", WEB / "index.html"]
 
 # Palette officielle de la charte + trois gris du filigrane et des bordures de tableau cités par la charte
 CHARTE = {"0a0a0a", "262626", "4a4a4a", "6e6e6e", "bdbdbd", "e4e4e4", "f5f5f5", "ffffff", "d9d9d9", "171717", "ededed", "d0d0d0"}

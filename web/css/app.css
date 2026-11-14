@@ -249,6 +249,7 @@ body.reveal .blister .dimple { animation: pop .45s both; }
   .alert { margin: 12px 16px 0; }
   .home { padding: 28px 18px 24px; }
   .home-top { grid-template-columns: 1fr; }
+  .illus { width: 100%; max-width: 420px; justify-self: center; }
   .suggest .tag { display: none; }
   .reading { grid-template-columns: 1fr; }
   .blister-wrap, .cmp-layout, .groups { grid-template-columns: 1fr; }

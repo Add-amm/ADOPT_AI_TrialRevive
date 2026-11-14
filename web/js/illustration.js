@@ -1,5 +1,5 @@
 // Bibliothèque d'illustrations : personnages et icônes de laboratoire en dessin au trait noir, aplats verts.
-// L'illustration d'accueil et les petites illustrations de chaque page sont composées avec les mêmes pièces.
+// Les petites illustrations de chaque page sont composées avec ces pièces (l'accueil a son animation : cells.js).
 const INK = "#1a1a1a", GREEN = "#6fcf9f", MINT = "#b8ecd2", SW = 2.5;
 
 /* ---------- pièces (coordonnées locales) ---------- */
@@ -68,21 +68,6 @@ const NURSE = `
 const NS = 'xmlns="http://www.w3.org/2000/svg" fill="none" stroke-linecap="round" stroke-linejoin="round"';
 const wrap = (viewBox, inner, label) =>
   `<svg viewBox="${viewBox}" role="img" aria-label="${label}" ${NS}><g stroke="${INK}" stroke-width="${SW}">${inner}</g></svg>`;
-
-/* ---------- illustration d'accueil ---------- */
-export const ILLUSTRATION = `
-<svg viewBox="0 0 700 300" role="img" aria-label="Trois chercheurs en tenue de laboratoire entourés d'icônes médicales" ${NS}>
-  <g stroke="${INK}" stroke-width="${SW}">
-    <g transform="translate(68 84)">${TUBES}</g>
-    <g transform="translate(88 232) rotate(-38)">${SYRINGE}</g>
-    <g transform="translate(250 18)">${HEART}</g>
-    <g transform="translate(404 6) scale(0.92)">${MOLECULE}</g>
-    <g transform="translate(596 206)">${KIT}</g>
-    <g transform="translate(168 65)">${PLUS}</g><g transform="translate(632 156)">${PLUS}</g>
-    <circle cx="214" cy="40" r="3.5" fill="${GREEN}" stroke="none"/><circle cx="612" cy="210" r="4" fill="${MINT}" stroke="none"/>
-    ${DOCTOR}${MAN}${NURSE}
-  </g>
-</svg>`;
 
 /* ---------- petites illustrations de pages ---------- */
 export const ART = {

@@ -18,7 +18,7 @@ Le contrat était absent du premier commit cloné (`5364ae0`). Le commit `f8676d
 - Supprimés car absents de la source : `web/js/capsule.js`, `web/vendor/three.min.js`, polices Bricolage Grotesque et IBM Plex Sans avec leurs licences. Ajoutés : logos officiels (`web/brand/`), police Manrope et sa licence.
 - **Backend inchangé** : `server.py`, `web_adapter.py`, `src/`, données et exigences ne sont pas modifiés. Le nouveau front appelle exactement les mêmes routes que le précédent ; la politique de sécurité (CSP) existante autorise déjà la police, les logos et le favicon servis localement.
 - Seul test adapté : `tests/test_web_browser.py` vérifie le chargement local de Manrope et du logo au lieu de three.js. `lancer.bat` (lanceur Windows de la fork) n'est pas repris ; sur ce dépôt, utiliser les commandes de « Lancer ».
-- Comparaison visuelle : les huit pages (accueil, aperçu, essais retenus, écartés, patients, dossier, comparaison, guide), capturées après le cas de démo sur le serveur de la fork puis sur celui de ce dépôt, sont **identiques au pixel près** (Chromium, 1440 × 900).
+- Comparaison visuelle : les huit pages (accueil, aperçu, essais retenus, écartés, patients, dossier, comparaison, guide), capturées après le cas de démo sur le serveur de la fork puis sur celui de ce dépôt, sont **identiques au pixel près** (Chromium, 1440 × 900). Cette comparaison précède l'ajout de l'animation d'accueil, qui modifie volontairement cette page.
 
 ## Écarts constatés avant écriture
 
@@ -98,7 +98,7 @@ Vérifications exécutées dans cet environnement :
 
 ## Modifications du front
 
-**Aucune.** Les 11 fichiers de `web/`, y compris la police, sa licence et les logos, sont identiques au commit source `efd42e7`. Le seul `innerHTML` du code applicatif sert aux SVG constants (icônes et illustrations) ; les données sont ajoutées sous forme de nœuds texte. Aucun changement d'apparence ou de mise en page n'a été effectué.
+**Une seule, demandée après le portage** : l'illustration de l'accueil (trois personnages) est remplacée par une animation de cellules vertes en division (`web/js/cells.js`, appelée depuis `web/js/app.js` ; l'ancienne constante `ILLUSTRATION` est retirée de `web/js/illustration.js` et une règle CSS limite sa largeur sur tablette). Elle utilise des dégradés SVG : second écart assumé à la charte, documenté dans `docs/GUIDE_FRONT.md` et `tests/test_charte.py`. Les autres fichiers de `web/`, y compris la police, sa licence et les logos, sont identiques au commit source `efd42e7`. Le seul `innerHTML` du code applicatif sert aux SVG constants (icônes et illustrations) ; les données sont ajoutées sous forme de nœuds texte. Aucun changement d'apparence ou de mise en page n'a été effectué.
 
 ## Ce qui reste
 

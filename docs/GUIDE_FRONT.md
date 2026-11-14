@@ -19,7 +19,8 @@ Les interfaces Streamlit (`app_ui.py`, `app.py`) restent en secours.
 | `server.py` | API (Starlette) : `/api/analyze`, `/api/baselines`, `/api/compare`, `/api/dossier.md`… Réutilise `src/` sans le modifier. |
 | `web/index.html` | Coquille de la page (barre latérale, tiroir, infobulle). |
 | `web/js/app.js` | Toutes les vues : accueil, aperçu, essais, écartés, patients, dossier, comparaison, guide. |
-| `web/js/illustration.js` | Illustrations vectorielles (personnages, icônes) : accueil et bandeaux de pages. |
+| `web/js/illustration.js` | Illustrations vectorielles (personnages, icônes) des bandeaux de pages et des états vides. |
+| `web/js/cells.js` | Animation de l'accueil : deux cellules vertes en division (SVG animé, sans bibliothèque ; image fixe si les animations sont réduites). |
 | `web/css/app.css` | Style complet, conforme à la charte graphique (`docs/charte/CHARTE_GRAPHIQUE.md`) : gris uniquement, Manrope, coins droits, sans ombre, dégradé ni 3D. |
 | `web/brand/`, `web/fonts/` | Logos officiels (SVG) et police Manrope, fournis par la charte, utilisés sans modification. |
 | `tests/test_charte.py` | Garde-fous automatiques : couleurs hors palette, coins arrondis, ombres, dégradés, polices ou ressources distantes font échouer le test. |
@@ -38,6 +39,7 @@ Les interfaces Streamlit (`app_ui.py`, `app.py`) restent en secours.
 - Aucune ressource distante : polices, logos et scripts sont dans `web/` (la démo doit marcher sans wifi).
 - **Charte graphique** : Manrope, logo officiel, coins droits, ni ombre, ni dégradé, ni 3D. Utilisez les variables de `app.css` (`--tr-*` pour les gris, `--vert`, `--menthe`, `--ambre` pour l'accent), jamais une couleur en dur.
 - **Écart assumé à la charte** : la charte est en gris uniquement, mais le tout gris faisait trop sombre pour un produit de santé. Le front ajoute un accent vert médical et de l'ambre pour les alertes. Les slides, le pitch et la vidéo doivent reprendre le même accent (ou la charte doit être mise à jour) pour garder une identité commune. Les couleurs autorisées sont listées dans `tests/test_charte.py`.
+- **Second écart assumé** : l'animation de l'accueil (`web/js/cells.js`) utilise des dégradés radiaux SVG et des transparences pour l'effet « verre », à la demande de l'équipe. Le reste du site garde des aplats, sans dégradé.
 - Données publiques ou fictives uniquement. Aucune clé ni secret dans le dépôt (`.env` est ignoré).
 - Les fichiers statiques ne sont pas mis en cache : rechargez la page après une modification.
 
