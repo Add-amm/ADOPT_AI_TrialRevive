@@ -91,7 +91,7 @@ def test_demo_to_dossier_comparison_and_safe_dom_without_internet(tmp_path):
         pw.expect(page.locator("#main")).to_contain_text("aucun bras cetuximab")
         assert not errors, errors
         assert not external, external
-        assert any("/assets/fonts/" in url for url in requested)
-        assert any("/assets/vendor/three.min.js" in url for url in requested)
+        assert any("/assets/fonts/Manrope-Variable.ttf" in url for url in requested)
+        assert any("/assets/brand/TrialRevive_logo_horizontal_noir.svg" in url for url in requested)
         context.close()
         browser.close()
