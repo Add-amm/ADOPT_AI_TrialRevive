@@ -57,6 +57,20 @@ Le résultat par défaut est `outputs/resultat_appariement.json`, indépendant d
 
 Un secret manquant, une erreur de connexion ou une table/colonne inconnue arrête la commande avec un message lisible. **Aucun basculement silencieux vers les huit fiches fictives n'est effectué.** Les erreurs publiques ne contiennent ni URI, ni mot de passe, ni contenu d'une ligne. Les variables de l'environnement ont priorité sur les fichiers `.env` locaux.
 
+### Si la connexion échoue sous Windows
+
+Une erreur de résolution du nom intervient avant l'authentification et ne valide ni n'invalide le mot de passe. Vérifier d'abord sans secret dans PowerShell :
+
+```powershell
+Test-NetConnection db.rnlfbeksplyoywweoddo.supabase.co -Port 5432
+```
+
+Si `Name resolution ... failed` apparaît, vérifier que le projet Supabase est actif et que l'hôte correspond à **Connect**. Une connexion directe Supabase peut aussi nécessiter IPv6. Pour une connexion compatible IPv4, sélectionner **Session pooler** dans **Connect** et copier **l'URI complète affichée** dans `DATABASE_URL` du fichier `.env` local. Le serveur, le port et le nom d'utilisateur du pooler peuvent être différents de ceux de la connexion directe : ne pas remplacer seulement le nom du serveur et ne pas deviner la région. Renseigner le mot de passe localement sans le publier.
+
+Une variable `DATABASE_URL` déjà définie dans PowerShell est prioritaire sur le fichier `.env`. Si l'on souhaite utiliser la valeur de ce fichier après modification, retirer l'ancienne variable du processus courant avec `Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue`, puis relancer `python matcher.py`.
+
+Les erreurs DNS, de réseau inaccessible, de délai, d'authentification et de certificat sont désormais distinguées même lorsque le pilote ne fournit aucun code SQLSTATE. En cas d'erreur TLS, fournir le certificat CA approprié via `PGSSLROOTCERT` ; ne pas désactiver sa vérification.
+
 ### Mode fichier explicite, hors ligne
 
 L'ancienne commande reste compatible :
@@ -83,7 +97,7 @@ Les exemples fictifs restent des données de test choisies explicitement. Les in
 
 ### Vérifications de cette modification
 
-- Dans `nouvel_essai_stat` : **40 tests réussis** (les 22 tests existants et 18 tests de source/CLI). Les règles et formules statistiques sont inchangées ; mêmes résultats sur les mêmes fiches, que la lecture soit simulée depuis PostgreSQL ou effectuée depuis un fichier.
+- Dans `nouvel_essai_stat` : **49 tests réussis** (les 22 tests existants et 27 tests de source/CLI et de diagnostic). Les règles et formules statistiques sont inchangées ; mêmes résultats sur les mêmes fiches, que la lecture soit simulée depuis PostgreSQL ou effectuée depuis un fichier.
 - Tests du projet principal, lancés séparément depuis la racine avec `python -m pytest -q tests/` : **79 tests réussis**.
 - La tentative de connexion au serveur Supabase avec le client PostgreSQL est bloquée dans l'environnement cloud par la résolution DNS du nom du serveur. **Connexion authentifiée, structure réelle de la table et résultat distant non validés.** Aucun contenu de la base distante n'a été lu ou exporté.
 - Le mot de passe communiqué n'est pas enregistré dans le dépôt ; il doit être fourni par `DATABASE_URL` ou `PGPASSWORD` au moment de l'exécution. N'utiliser que les données d'essais publiques ou fictives prévues pour ce projet.

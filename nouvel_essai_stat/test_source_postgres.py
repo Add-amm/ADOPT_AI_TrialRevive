@@ -126,6 +126,29 @@ def test_driver_failure_is_redacted(monkeypatch):
     assert "impossible" in str(err.value)
 
 
+@pytest.mark.parametrize("detail,expected", [
+    ('could not translate host name "private-fixture-host" to address', "Résolution DNS"),
+    ('[Errno 11001] getaddrinfo failed private-fixture-host', "Résolution DNS"),
+    ('failed to resolve host private-fixture-host', "Résolution DNS"),
+    ('network is unreachable private-fixture-host', "Réseau PostgreSQL inaccessible"),
+    ('SSL error: certificate verify failed private-fixture-credential', "certificat TLS"),
+    ('server certificate does not match host name private-fixture-host', "certificat TLS"),
+    ('FATAL: password authentication failed private-fixture-credential', "Authentification"),
+    ('connection timeout expired private-fixture-host', "Délai de connexion"),
+    ('connection refused private-fixture-host', "Connexion PostgreSQL refusée"),
+])
+def test_connection_diagnostics_without_sqlstate_are_precise_and_redacted(monkeypatch, detail, expected):
+    monkeypatch.setattr(pg, "charger_environnement", lambda: None)
+    monkeypatch.setattr(pg, "options_connexion", lambda: {})
+    def unavailable(**kwargs):
+        raise psycopg.OperationalError(detail)
+    monkeypatch.setattr(psycopg, "connect", unavailable)
+    with pytest.raises(pg.ErreurPostgres) as err:
+        list(pg.lire_postgres())
+    assert expected in str(err.value)
+    assert "private-fixture" not in str(err.value)
+
+
 @pytest.mark.parametrize("suffix", [".csv", ".jsonl", ".jsonl.gz"])
 def test_explicit_file_formats_remain_available(tmp_path, suffix):
     record = _rec("FICTIF-FILE", 1100)

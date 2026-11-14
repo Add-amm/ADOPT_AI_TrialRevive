@@ -16,6 +16,42 @@ class ErreurPostgres(RuntimeError):
     """Diagnostic public sans URI, mot de passe ou contenu de ligne."""
 
 
+def diagnostic_postgres(exc):
+    """Classe l'erreur libpq sans afficher son texte, qui peut contenir un secret.
+
+    Les échecs de connexion n'ont souvent pas de SQLSTATE : se limiter à celui-ci
+    masquait notamment les erreurs DNS de Windows et les erreurs de certificat.
+    """
+    code = getattr(exc, "sqlstate", None)
+    detail = str(exc).casefold()
+    if code in ("42P01", "42703", "3F000"):
+        return ("Table ou colonne PostgreSQL introuvable. Vérifiez PG_TRIALS_SCHEMA, "
+                "PG_TRIALS_TABLE et PG_TRIALS_JSON_COLUMN.")
+    if code in ("28P01", "28000", "42501") or any(s in detail for s in (
+            "password authentication failed", "authentication failed", "no password supplied")):
+        return "Authentification ou droits de lecture PostgreSQL refusés. Vérifiez les identifiants de DATABASE_URL."
+    if any(s in detail for s in ("could not translate host name", "could not resolve", "failed to resolve",
+                                 "name or service not known", "name resolution", "getaddrinfo",
+                                 "no such host is known", "nodename nor servname")):
+        return ("Résolution DNS du serveur PostgreSQL impossible : le nom d'hôte n'est pas résolu. "
+                "Vérifiez l'hôte et l'état du projet dans Supabase > Connect ; si la connexion directe "
+                "est inaccessible, utilisez l'URI exacte du Session pooler compatible IPv4 dans DATABASE_URL.")
+    if any(s in detail for s in ("certificate verify failed", "certificate verification failed",
+                                 "self-signed certificate", "root certificate file", "unable to get local issuer",
+                                 "does not match host name", "hostname mismatch", "server does not support ssl")):
+        return ("Vérification du certificat TLS PostgreSQL impossible. Vérifiez l'hôte et fournissez "
+                "le certificat CA approprié via PGSSLROOTCERT. Conservez sslmode=verify-full.")
+    if any(s in detail for s in ("network is unreachable", "no route to host", "10051", "10065")):
+        return ("Réseau PostgreSQL inaccessible. Si l'endpoint direct Supabase est en IPv6 et votre réseau "
+                "ne le permet pas, utilisez l'URI exacte du Session pooler compatible IPv4.")
+    if any(s in detail for s in ("timeout expired", "connection timed out", "timed out")):
+        return "Délai de connexion PostgreSQL dépassé. Vérifiez l'accès réseau au serveur et à son port."
+    if any(s in detail for s in ("connection refused", "actively refused", "10061")):
+        return "Connexion PostgreSQL refusée par le serveur. Vérifiez l'hôte, le port et l'état du projet."
+    return ("Connexion ou lecture PostgreSQL impossible. Vérifiez le réseau, l'hôte, "
+            "les identifiants et le certificat TLS ; aucun repli vers des données fictives n'est effectué.")
+
+
 def charger_environnement():
     from dotenv import load_dotenv
 
@@ -62,16 +98,7 @@ def connexion_lecture_seule():
             conn.execute("SET LOCAL statement_timeout = '30s'")
             yield conn
     except psycopg.Error as exc:
-        code = getattr(exc, "sqlstate", None)
-        if code in ("42P01", "42703", "3F000"):
-            message = ("Table ou colonne PostgreSQL introuvable. Vérifiez PG_TRIALS_SCHEMA, "
-                       "PG_TRIALS_TABLE et PG_TRIALS_JSON_COLUMN.")
-        elif code in ("28P01", "28000", "42501"):
-            message = "Authentification ou droits de lecture PostgreSQL refusés."
-        else:
-            message = ("Connexion ou lecture PostgreSQL impossible. Vérifiez le réseau, l'hôte, "
-                       "les identifiants et le certificat TLS ; aucun repli vers des données fictives n'est effectué.")
-        raise ErreurPostgres(message) from None
+        raise ErreurPostgres(diagnostic_postgres(exc)) from None
 
 
 def lire_postgres(*, schema=None, table=None, colonne=None):
