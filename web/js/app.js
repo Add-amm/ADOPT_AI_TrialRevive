@@ -1,11 +1,17 @@
-import { Capsule } from "./capsule.js";
 import { ILLUSTRATION, ART } from "./illustration.js";
 
 /* ================= utilitaires ================= */
 const $ = (sel, el = document) => el.querySelector(sel);
 const nf = new Intl.NumberFormat("fr-FR");
 const fmt = (n) => (n == null ? "—" : nf.format(n));
-const pct = (x) => (x == null ? "inconnue" : `${Math.round(x * 100)} %`);
+const pct = (x) => (Array.isArray(x) ? x.map(pct).join(" à ") : x == null ? "non calculé" : `${Math.round(x * 100)} %`);
+const labelOf = (t) => t.nct_id || t.trial_id || "Identifiant non renseigné";
+const shown = (v) => v == null ? "non calculé" : v;
+const powerOf = (t) => t.puissance_a_priori ? pct(t.puissance_a_priori.fourchette ?? t.puissance_a_priori.valeur) : "non calculé";
+function referenceList(refs) {
+  return h("ul", { class: "plain" }, Object.entries(refs || {}).map(([field, r]) =>
+    h("li", {}, `${field} : ${r?.doc || (typeof r === "string" ? r : "source non renseignée")} — ${r?.passage || "passage non renseigné"}`)));
+}
 
 // Construit le DOM sans innerHTML : les textes venant des données restent du texte (pas de HTML injecté).
 function h(tag, attrs, ...kids) {
@@ -62,22 +68,19 @@ async function api(path, body) {
 }
 
 /* ================= état ================= */
-const state = { dossier: null, markdown: "", question: "", example: "", loading: false };
-let capsule = null;
+const state = { dossier: null, markdown: "", question: "", example: "", questions: [], source: "", fictitious: false, loading: false };
+// La preuve se lit à l'intensité : plus elle est forte, plus le vert est foncé.
 const E_COLOR = { E0: "#dbe4df", E1: "#bfe6d3", E2: "#86d1ae", E3: "#3fae7f", E4: "#1b7f58" };
-const DEFAULT_EXAMPLE = "Le statut KRAS change-t-il l'effet du panitumumab dans le cancer colorectal métastatique ?";
 const REJECT = {
-  1: ["Pas de tirage au sort", "#e6ebf2"],
-  2: ["Autre médicament", "#d6dfeb"],
-  3: ["Marqueur non mesuré", "#c7d3e3"],
-  4: ["Un seul statut du marqueur", "#b8c6dc"],
-  5: ["Trop peu de patients", "#a9bad4"],
-  6: ["Statut connu pour trop peu de patients", "#9aaecb"],
+  1: ["Exigences obligatoires", "#F5F5F5"],
+  2: ["Compatibilité et puissance", "#E4E4E4"],
 };
 const ROUTES = {
   apercu: ["Aperçu", "grid"],
   essais: ["Essais retenus", "flask"],
   ecartes: ["Essais écartés", "ban"],
+  completer: ["À compléter", "alert"],
+  encours: ["En cours", "book"],
   patients: ["Patients", "users"],
   dossier: ["Dossier", "file"],
   comparaison: ["Comparaison IA", "scale"],
@@ -87,19 +90,21 @@ const route = () => (location.hash.match(/^#\/([a-z]+)/) || [])[1] || "accueil";
 
 /* ================= composants ================= */
 function meter(level, small) {
+  if (!E_COLOR[level]) return h("span", {}, "non calculé");
   const idx = Number(level.slice(1));
   const segs = [1, 2, 3, 4].map((i) => h("i", { style: i <= idx ? `background:${E_COLOR[level]}` : "" }));
   return h("div", { class: "meter" + (small ? " meter-sm" : ""), role: "img", "aria-label": `Preuve ${level}` }, segs);
 }
 const evidenceTag = (level) => h("span", { class: "num", style: "display:inline-flex;gap:10px;align-items:center" }, meter(level, true), h("b", {}, level));
-const kindBadge = (niveau) => h("span", { class: "badge " + (niveau === "direct" ? "badge-cobalt" : "badge-slate") }, niveau === "direct" ? "Médicament exact" : "Même classe");
+const kindBadge = (index) => h("span", { class: "badge " + (index === "interne" ? "badge-ink" : "badge-soft") }, index === "interne" ? "Interne" : index === "externe" ? "Externe" : "Origine non renseignée");
 
 function artRow(names) {
   return h("div", { class: "art" }, names.map((n) => h("span", { class: `art-${n}`, html: ART[n] })));
 }
 function pageHead(title, text, names, extra) {
+  const label = ROUTES[route()]?.[0];
   return h("header", { class: "pagehead" },
-    h("div", { class: "pagehead-copy" }, h("h2", {}, title), text && h("p", {}, text), extra),
+    h("div", { class: "pagehead-copy" }, label && label !== title && h("p", { class: "kicker" }, label), h("h2", {}, title), text && h("p", {}, text), extra),
     names && names.length ? artRow(names) : null);
 }
 const HEAD_ART = {
@@ -140,46 +145,35 @@ function closeDrawer() {
   lastFocus?.focus?.();
 }
 function trialDrawer(t) {
-  const d = state.dossier;
-  const src = d.sources.find((x) => x.nct_id === t.nct_id);
-  const body = h("div", {}, h("p", { class: "t-sub" }, t.nct_id), h("h3", {}, t.titre));
+  const body = h("div", {}, h("p", { class: "t-sub" }, labelOf(t)), h("h3", {}, t.titre));
   if (t.retenu) {
-    body.append(
-      h("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:6px" }, kindBadge(t.niveau), h("span", { class: "badge" }, evidenceTag(t.E))),
+    body.append(h("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:6px" }, kindBadge(t.index), evidenceTag(t.E)),
       h("dl", { class: "facts" },
-        h("div", {}, h("dt", {}, "Patients inclus"), h("dd", { class: "num" }, fmt(t.nb_patients))),
-        h("div", {}, h("dt", {}, "Statut du marqueur connu"), h("dd", { class: "num" }, pct(t.couverture))),
-        h("div", {}, h("dt", {}, "Score de compatibilité"), h("dd", { class: "num" }, t.score)),
-        h("div", {}, h("dt", {}, "Plafond de preuve"), h("dd", {}, t.plafond)),
-      ),
-      h("h4", {}, "Comment obtenir la réponse"), h("p", {}, `${t.R} : ${t.R_pourquoi}.`),
-      h("h4", {}, "Écarts acceptés"),
-      t.ecarts.length ? h("ul", {}, t.ecarts.map((e) => h("li", {}, e))) : h("p", {}, "Aucun écart : l'essai remplit toutes les exigences."),
-      h("h4", {}, "À confirmer par un humain"), h("ul", {}, t.conditions.map((c) => h("li", {}, c))),
-    );
-    if (src?.reanalyse) {
-      body.append(h("h4", {}, "Réanalyse publiée du marqueur"), h("p", {}, src.reanalyse),
-        h("p", { style: "margin-top:6px" }, src.reanalyse_verifiee ? "Vérifiée par un humain." : "Référence rattachée au registre ; effectifs et conclusions encore à vérifier."),
-        src.publication_lien && h("p", { style: "margin-top:6px" }, h("a", { href: src.publication_lien, target: "_blank", rel: "noopener" }, "Ouvrir la publication")));
-    }
+        h("div", {}, h("dt", {}, "Patients randomisés"), h("dd", { class: "num" }, fmt(t.nb_patients))),
+        h("div", {}, h("dt", {}, "Couverture prévue"), h("dd", { class: "num" }, pct(t.couverture))),
+        h("div", {}, h("dt", {}, "Score de compatibilité"), h("dd", {}, shown(t.score))),
+        h("div", {}, h("dt", {}, "Puissance a priori"), h("dd", {}, powerOf(t)))),
+      h("h4", {}, "Comment obtenir la réponse"), h("p", {}, `${shown(t.R)} : ${shown(t.R_pourquoi)}`),
+      h("h4", {}, "Écarts acceptés"), h("ul", {}, t.ecarts.map((v) => h("li", {}, v))),
+      h("h4", {}, "À confirmer"), h("ul", {}, t.conditions.map((v) => h("li", {}, v))),
+      h("h4", {}, "Gains possibles pour cet essai"), h("ul", {}, t.gains.map((g) => h("li", {}, `${g.code} : ${g.libelle}`))));
+  } else if (t.statut === "a_completer") {
+    body.append(h("h4", {}, "Champs manquants"), h("ul", {}, t.champs_manquants.map((v) => h("li", {}, v))));
+  } else if (t.statut === "en_cours") {
+    body.append(h("h4", {}, "En cours"), h("p", {}, t.motif));
   } else {
-    body.append(h("div", { style: "margin-top:8px" }, h("span", { class: "badge badge-slate" }, "Écarté")), h("h4", {}, "Raison"), h("p", {}, t.raison));
+    body.append(h("h4", {}, `Exclusion à l'étage ${t.etape_rejet}`), h("ul", {}, t.raisons.map((v) => h("li", {}, v))),
+      h("ul", {}, t.ecarts_avant_exclusion.map((v) => h("li", {}, v))));
   }
-  body.append(h("p", { style: "margin-top:22px" }, h("a", { href: t.lien, target: "_blank", rel: "noopener" }, "Voir la fiche sur ClinicalTrials.gov")));
+  if (t.avertissements.length) body.append(h("h4", {}, "À vérifier"), h("ul", {}, t.avertissements.map((v) => h("li", {}, v))));
+  body.append(h("h4", {}, "Sources de la fiche"), referenceList(t.references));
+  if (t.lien) body.append(h("p", { style: "margin-top:22px" }, h("a", { href: t.lien, target: "_blank", rel: "noopener" }, "Voir la fiche sur ClinicalTrials.gov")));
   return body;
 }
 
 /* ================= vues ================= */
 function landing() {
-  const example = state.example || DEFAULT_EXAMPLE;
-  const all = [
-    { q: example, tag: "Cas de démo" },
-    { q: example.replace("panitumumab", "cetuximab"), tag: "Sans comptage interne" },
-  ];
-  if (state.question && !all.some((x) => x.q === state.question)) all.push({ q: state.question, tag: "Dernière analyse" });
-
-  const canvas = h("canvas", { "aria-hidden": "true" });
-  const fallback = h("div", { class: "fallback", hidden: true, html: '<svg width="120" height="120" viewBox="0 0 64 64" aria-hidden="true"><g transform="rotate(-45 32 32)"><rect x="8" y="22" width="48" height="20" rx="10" fill="#e8eeea" stroke="#1a1a1a" stroke-width="2"/><path d="M32 22h14a10 10 0 0 1 0 20H32z" fill="#3fae7f" stroke="#1a1a1a" stroke-width="2"/></g></svg>' });
+  const all = state.questions.map((v, i) => ({ q: v.question, tag: i === 0 ? "Cas de démo" : v.id }));
 
   const input = h("input", { id: "finder", type: "text", maxlength: "600", autocomplete: "off", role: "combobox", "aria-expanded": "true", "aria-controls": "suggest",
     "aria-autocomplete": "list", "aria-label": "Rechercher une question scientifique", placeholder: "Rechercher une question scientifique" });
@@ -209,87 +203,69 @@ function landing() {
   const go = h("button", { class: "finder-go", type: "submit", "aria-label": "Analyser la question" }, icon("arrow", 20));
   const form = h("form", { onsubmit: (e) => { e.preventDefault(); run(active >= 0 && shown[active] ? shown[active].q : input.value); } }, input, go);
 
-  setTimeout(() => { capsule?.dispose(); capsule = new Capsule(canvas, fallback); }, 0);
   return h("section", { class: "home", "aria-labelledby": "h1" },
-    h("h1", { id: "h1" }, "Trouvez les essais qui peuvent répondre à votre question"),
-    h("div", { class: "illus" }, h("div", { html: ILLUSTRATION }), h("div", { class: "cap3d" }, canvas, fallback)),
+    h("div", { class: "home-top" },
+      h("div", {}, h("h1", { id: "h1" }, "Trouvez les essais qui peuvent répondre à votre question"), h("p", { class: "lede" }, "Une question entre. Un dossier de faisabilité sort.")),
+      h("div", { class: "illus", html: ILLUSTRATION })),
     h("div", { class: "finder" }, form, list),
-    h("p", { class: "home-note" }, "Essais publics de ClinicalTrials.gov. Patients de l'essai interne fictifs.",
+    h("p", { class: "home-note" }, state.fictitious ? "Démonstration sur fiches entièrement fictives." : "Données de la base configurée. Aucun comptage individuel de patients.",
       state.dossier && [" ", h("a", { href: "#/apercu" }, "Revenir au dernier dossier")]),
   );
 }
 
 function reading(d) {
-  const v = d.verdict;
-  const gains = v.G.slice(0, 3).map((g) => h("li", {}, h("b", {}, g.code), g.gain));
-  const panel = (art, k, value, valueStyle, ...rest) =>
-    h("div", { class: "rpanel" }, h("span", { class: "rico", html: ART[art] }), h("p", { class: "k" }, k), h("p", { class: "v", style: valueStyle }, value), ...rest);
-  return h("section", { class: "reading", "aria-label": "Verdict" },
-    panel("syringe", "Comment obtenir la réponse", v.R, "", h("p", { class: "d" }, v.R_texte)),
-    panel("heart", "Force de la preuve atteignable", v.E, `color:${E_COLOR[v.E]}`, meter(v.E), h("p", { class: "d" }, `${v.E_texte}. Atteignable, pas acquis.`),
-      !v.preuve_verifiee && h("p", { class: "note" }, "Les références des réanalyses sont en cours de vérification par un humain.")),
-    panel("kit", "Ce que ça apporte", `${v.G.length} gains`, "", h("ul", {}, gains, v.G.length > 3 && h("li", {}, h("a", { href: "#/dossier" }, `et ${v.G.length - 3} autres dans le dossier`)))),
-  );
+  const panel = (art, title, value, text) => h("div", { class: "rpanel" },
+    h("span", { class: "rico", html: ART[art] }), h("p", { class: "k" }, title), h("p", { class: "v" }, value), h("p", { class: "d" }, text));
+  return h("section", { class: "reading", "aria-label": "Verdicts" },
+    panel("syringe", "Comment obtenir la réponse", "Par essai", d.verdict.R_texte),
+    panel("heart", "Force de la preuve atteignable", "Par essai", "Les niveaux restent ceux de chaque essai ; aucun niveau global n'est calculé."),
+    panel("kit", "Gains possibles", "Par essai", "Consultez les gains et conditions dans les fiches des essais retenus."));
 }
 
 function blister(d) {
-  const kept = d.retenus;
-  const groupOf = (t) => (t.retenu ? (t.niveau === "direct" ? "k-direct" : "k-classe") : `r${t.etape_rejet}`);
-  const items = [
-    ...kept.map((t) => ({ t, g: groupOf(t) })),
-    ...[...d.ecartes].sort((a, b) => a.etape_rejet - b.etape_rejet).map((t) => ({ t, g: groupOf(t) })),
-  ];
+  const items = [...d.retenus, ...d.ecartes, ...d.a_completer, ...d.en_cours];
+  if (!items.length) return h("p", { class: "note" }, "Aucun essai dans le corpus chargé.");
+  const groupOf = (t) => t.retenu ? t.index : t.statut === "exclu" ? `r${t.etape_rejet}` : t.statut;
+  const defs = [["interne", "Retenus internes", "#1b7f58"], ["externe", "Retenus externes", "#86d1ae"],
+    ["r1", REJECT[1][0], REJECT[1][1]], ["r2", REJECT[2][0], REJECT[2][1]],
+    ["a_completer", "À compléter", "#BDBDBD"], ["en_cours", "En cours", "#D9D9D9"]];
   const cols = 13, cell = 32, rows = Math.ceil(items.length / cols);
-  const svg = s("svg", { class: "blister", viewBox: `0 0 ${cols * cell} ${rows * cell}`, role: "group", "aria-label": `${items.length} essais : ${kept.length} retenus, ${items.length - kept.length} écartés` });
-  const tints = (g) => (g.startsWith("r") ? REJECT[g.slice(1)][1] : "#f4f6fa");
-  items.forEach(({ t, g }, i) => {
-    const cx = (i % cols) * cell + cell / 2, cy = Math.floor(i / cols) * cell + cell / 2;
-    const node = s("g", { class: "dimple", tabindex: "0", role: "button", "data-g": g, "aria-label": `${t.nct_id} : ${t.retenu ? "retenu, preuve " + t.E : "écarté, " + t.raison}` });
+  const svg = s("svg", { class: "blister", viewBox: `0 0 ${cols * cell} ${rows * cell}`, role: "group", "aria-label": `${items.length} essais examinés` });
+  items.forEach((t, i) => {
+    const group = groupOf(t), cx = (i % cols) * cell + cell / 2, cy = Math.floor(i / cols) * cell + cell / 2;
+    const status = t.retenu ? `retenu ${t.index}, preuve ${shown(t.E)}` : t.statut === "exclu" ? t.raison : t.statut === "en_cours" ? "en cours" : "à compléter";
+    const node = s("g", { class: "dimple", tabindex: "0", role: "button", "data-g": group, "aria-label": `${labelOf(t)} : ${status}` });
     node.style.animationDelay = `${i * 8}ms`;
-    node.append(s("circle", { class: "cup", cx, cy, r: 13, fill: tints(g) }));
-    if (t.retenu) {
-      node.append(t.niveau === "direct"
-        ? s("circle", { cx, cy, r: 8.5, fill: E_COLOR[t.E] })
-        : s("circle", { cx, cy, r: 7.5, fill: "none", stroke: E_COLOR[t.E], "stroke-width": 3.2 }));
-    }
-    const label = t.retenu ? `Retenu, preuve ${t.E}, ${t.niveau === "direct" ? "médicament exact" : "même classe"}` : t.raison;
-    node.addEventListener("mouseenter", (e) => showTip(e, `${t.nct_id}`, `${t.titre.length > 70 ? t.titre.slice(0, 68) + "…" : t.titre} — ${label}`));
-    node.addEventListener("focus", (e) => showTip(e, `${t.nct_id}`, label));
-    node.addEventListener("mouseleave", hideTip);
-    node.addEventListener("blur", hideTip);
+    node.append(s("circle", { class: "cup", cx, cy, r: 13, fill: t.retenu ? "#FFFFFF" : defs.find(([g]) => g === group)?.[2] || "#F5F5F5" }));
+    if (t.retenu) node.append(t.index === "interne" ? s("circle", { cx, cy, r: 8.5, fill: E_COLOR[t.E] })
+      : s("circle", { cx, cy, r: 7.5, fill: "none", stroke: E_COLOR[t.E], "stroke-width": 3.2 }));
+    node.addEventListener("mouseenter", (e) => showTip(e, labelOf(t), `${t.titre} — ${status}`));
+    node.addEventListener("focus", (e) => showTip(e, labelOf(t), status));
+    node.addEventListener("mouseleave", hideTip); node.addEventListener("blur", hideTip);
     node.addEventListener("click", () => { hideTip(); openDrawer(trialDrawer(t)); });
     node.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); node.dispatchEvent(new Event("click")); } });
     svg.append(node);
   });
-
-  const count = (g) => items.filter((x) => x.g === g).length;
-  const legendDefs = [
-    ["k-direct", "Retenu, médicament exact", "#1b7f58"],
-    ["k-classe", "Retenu, même classe", "#86d1ae"],
-    ...[1, 2, 3, 4, 5, 6].map((n) => [`r${n}`, REJECT[n][0], REJECT[n][1]]),
-  ].filter(([g]) => count(g) > 0);
   let active = null;
-  const legend = h("ul", { class: "legend" }, legendDefs.map(([g, label, color]) =>
+  const legend = h("ul", { class: "legend" }, defs.filter(([g]) => items.some((t) => groupOf(t) === g)).map(([group, title, color]) =>
     h("li", {}, h("button", { type: "button", "aria-pressed": "false", onclick: (e) => {
-      active = active === g ? null : g;
-      svg.classList.toggle("is-filtering", active !== null);
+      active = active === group ? null : group; svg.classList.toggle("is-filtering", active !== null);
       svg.querySelectorAll(".dimple").forEach((n) => n.classList.toggle("on", n.dataset.g === active));
       legend.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", "false"));
       if (active) e.currentTarget.setAttribute("aria-pressed", "true");
-    } }, h("span", { class: "sw", style: `background:${color}` }), h("span", {}, label), h("span", { class: "n num" }, count(g))))));
-  return h("div", { class: "blister-wrap" }, h("div", { class: "panel-box" }, svg), h("div", {},
-    legend,
-    h("p", { class: "t-sub", style: "margin-top:12px;font-family:inherit" }, "Cliquez sur une alvéole pour le détail, sur une ligne de légende pour isoler un groupe."),
-  ));
+    } }, h("span", { class: "sw", style: `background:${color}` }), h("span", {}, title), h("span", { class: "n num" }, items.filter((t) => groupOf(t) === group).length)))));
+  return h("div", { class: "blister-wrap" }, h("div", { class: "panel-box" }, svg), h("div", {}, legend,
+    h("p", { class: "t-sub", style: "margin-top:12px;font-family:inherit" }, "Cliquez sur une alvéole pour le détail, sur une légende pour isoler un statut.")));
 }
 
 function funnelBars(d, withDrops) {
+  if (!d.entonnoir.length) return h("p", { class: "note" }, d.raison_indetermination);
   const top = d.entonnoir[0].n || 1;
   return h("div", { class: "funnel" }, d.entonnoir.map((st, i) => {
     const [code, ...rest] = st.etape.split(" : ");
     const prev = i ? d.entonnoir[i - 1].n : null;
     const bar = h("i", { style: `width:${(100 * st.n) / top}%` });
-    return h("div", { class: "frow" },
+    return h("div", { class: "frow" + (code.startsWith("S4") ? " final" : "") },
       h("div", { class: "lab" }, h("b", {}, code), rest.length ? ` : ${rest.join(" : ")}` : ""),
       h("div", { class: "bar" }, bar),
       h("div", { class: "val num" }, st.n_publie == null ? "<5" : fmt(st.n_publie), withDrops && prev != null && st.n < prev ? h("small", {}, `−${prev - st.n}`) : ""),
@@ -301,13 +277,13 @@ function overview() {
   const d = state.dossier;
   const nbTotal = d.rejection.total;
   const wrap = h("div", {},
-    pageHead(d.question, `${fmt(nbTotal)} essais publics analysés : ${d.retenus.length} peuvent répondre, ${fmt(d.ecartes.length)} sont écartés avec une raison.`, ["heart", "tubes", "syringe"]),
+    pageHead(d.question, `${fmt(nbTotal)} essais examinés : ${d.internes.length} interne${d.internes.length > 1 ? "s" : ""} et ${d.externes.length} externe${d.externes.length > 1 ? "s" : ""} retenus, ${d.ecartes.length} exclus, ${d.a_completer.length} à compléter, ${d.en_cours.length} en cours.`, ["heart", "tubes", "syringe"]),
     reading(d),
     h("section", { class: "section" }, h("h3", {}, `${fmt(nbTotal)} essais, une alvéole chacun`),
-      h("p", { class: "sub" }, "Les essais retenus sont remplis. Les autres restent vides, regroupés par raison d'écart."), blister(d)),
-    h("section", { class: "section" }, h("h3", {}, "Du prévu au complet, sur l'essai interne"),
-      h("p", { class: "sub" }, "Patients fictifs. Avoir 400 lignes ne veut pas dire avoir 400 patients analysables."), h("div", { class: "panel-box" }, funnelBars(d, true),
-        h("p", { style: "margin-top:16px" }, h("a", { href: "#/patients" }, "Voir le détail et les effets par groupe")))),
+      h("p", { class: "sub" }, "Chaque essai conserve son statut : interne ou externe retenu, exclu, à compléter ou en cours."), blister(d)),
+    h("section", { class: "section" }, h("h3", {}, "Disponibilité des données individuelles"),
+      h("p", { class: "sub" }, "Les effectifs randomisés ne remplacent pas un comptage individuel S0 à S4."), h("div", { class: "panel-box" }, funnelBars(d, true),
+        h("p", { style: "margin-top:16px" }, h("a", { href: "#/patients" }, "Voir les données disponibles")))),
   );
   document.body.classList.add("reveal");
   setTimeout(() => document.body.classList.remove("reveal"), 1800);
@@ -316,20 +292,17 @@ function overview() {
 
 function trialsView() {
   const d = state.dossier;
-  const rows = d.retenus.map((t, i) => h("tr", { tabindex: "0", onclick: () => openDrawer(trialDrawer(t)),
-    onkeydown: (e) => { if (e.key === "Enter") openDrawer(trialDrawer(t)); } },
-    h("td", { class: "num" }, i + 1),
-    h("td", {}, h("div", { class: "t-title" }, t.titre), h("div", { class: "t-sub" }, t.nct_id)),
-    h("td", {}, kindBadge(t.niveau)),
-    h("td", { class: "right num" }, fmt(t.nb_patients)),
-    h("td", {}, evidenceTag(t.E)),
-    h("td", { class: "right num" }, t.score),
-    h("td", { class: "right num" }, pct(t.couverture)),
-  ));
-  return h("div", {}, viewHead("Essais retenus", "Classés par plafond de preuve, puis score de compatibilité, puis effectif. Cliquez une ligne pour les écarts acceptés et ce qu'il reste à confirmer."),
-    h("div", { class: "table-wrap" }, h("table", {},
-      h("thead", {}, h("tr", {}, ["Rang", "Essai", "Médicament", "Patients", "Preuve", "Score", "Statut connu"].map((c, i) => h("th", { class: i > 2 && c !== "Preuve" ? "right" : "" }, c)))),
-      h("tbody", {}, rows))));
+  const table = (items, title) => h("section", { class: "section" }, h("h3", {}, `${title} (${items.length})`),
+    items.length ? h("div", { class: "table-wrap" }, h("table", {},
+      h("thead", {}, h("tr", {}, ["Rang", "Essai", "Origine", "Patients randomisés", "Preuve", "Score", "Couverture prévue", "Puissance a priori"].map((v) => h("th", {}, v)))),
+      h("tbody", {}, items.map((t, i) => h("tr", { tabindex: "0", onclick: () => openDrawer(trialDrawer(t)),
+        onkeydown: (e) => { if (e.key === "Enter") openDrawer(trialDrawer(t)); } },
+        h("td", { class: "num" }, i + 1), h("td", {}, h("div", { class: "t-title" }, t.titre), h("div", { class: "t-sub" }, labelOf(t))),
+        h("td", {}, kindBadge(t.index)), h("td", { class: "right num" }, fmt(t.nb_patients)), h("td", {}, evidenceTag(t.E)),
+        h("td", { class: "right num" }, shown(t.score)), h("td", { class: "right num" }, pct(t.couverture)), h("td", { class: "right num" }, powerOf(t)))))))
+      : h("p", { class: "note" }, "Aucun essai retenu dans ce groupe."));
+  return h("div", {}, viewHead("Essais retenus", "Classements internes et externes séparés, dans l'ordre fourni par le moteur. Cliquez une ligne pour les conditions et les sources."),
+    table(d.internes, "Essais internes"), table(d.externes, "Essais externes"));
 }
 
 function rejectedView() {
@@ -339,9 +312,9 @@ function rejectedView() {
   d.ecartes.forEach((t) => (counts[t.etape_rejet] = (counts[t.etape_rejet] || 0) + 1));
   const body = h("tbody");
   const draw = () => {
-    const rows = d.ecartes.filter((t) => (only == null || t.etape_rejet === only) && (`${t.titre} ${t.nct_id} ${t.raison}`).toLowerCase().includes(q));
+    const rows = d.ecartes.filter((t) => (only == null || t.etape_rejet === only) && (`${t.titre} ${labelOf(t)} ${t.raison}`).toLowerCase().includes(q));
     body.replaceChildren(...(rows.length ? rows.map((t) => h("tr", { tabindex: "0", onclick: () => openDrawer(trialDrawer(t)), onkeydown: (e) => { if (e.key === "Enter") openDrawer(trialDrawer(t)); } },
-      h("td", {}, h("div", { class: "t-title" }, t.titre), h("div", { class: "t-sub" }, t.nct_id)), h("td", {}, t.raison))) : [h("tr", {}, h("td", { colspan: 2 }, "Aucun essai ne correspond à ce filtre."))]));
+      h("td", {}, h("div", { class: "t-title" }, t.titre), h("div", { class: "t-sub" }, labelOf(t))), h("td", {}, t.raison))) : [h("tr", {}, h("td", { colspan: 2 }, "Aucun essai ne correspond à ce filtre."))]));
     count.textContent = `${rows.length} essai${rows.length > 1 ? "s" : ""} affiché${rows.length > 1 ? "s" : ""}`;
   };
   const count = h("span", { class: "t-sub", style: "font-family:inherit" });
@@ -359,88 +332,68 @@ function rejectedView() {
     h("div", { class: "table-wrap" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Essai"), h("th", {}, "Raison de l'écart"))), body)));
 }
 
+function pendingView(kind) {
+  const items = state.dossier[kind];
+  const title = kind === "a_completer" ? "À compléter" : "En cours";
+  return h("div", {}, viewHead(title, kind === "a_completer" ? "Ces fiches demandent des informations supplémentaires ; elles ne sont pas exclues." : "Ces essais ne sont pas encore commencés à la date de l'hypothèse ; ils ne sont pas exclus."),
+    items.length ? h("div", { class: "table-wrap" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Essai"), h("th", {}, "Détail"))),
+      h("tbody", {}, items.map((t) => h("tr", { tabindex: "0", onclick: () => openDrawer(trialDrawer(t)), onkeydown: (e) => { if (e.key === "Enter") openDrawer(trialDrawer(t)); } },
+        h("td", {}, h("div", { class: "t-title" }, t.titre), h("div", { class: "t-sub" }, labelOf(t))),
+        h("td", {}, kind === "a_completer" ? t.champs_manquants.join(", ") : t.motif))))))
+      : h("p", { class: "note" }, "Aucun essai dans ce statut."));
+}
+
 function patientsView() {
-  const d = state.dossier;
-  const first = d.entonnoir[0].n;
-  const head = d.utilisables == null
-    ? h("div", { class: "hero-num" }, h("span", { class: "b" }, "Indéterminé"), h("p", { class: "d" }, d.raison_indetermination || "Effectif inférieur à 5 : masqué."))
-    : h("div", { class: "hero-num num" }, h("span", { class: "a" }, fmt(first)), icon("arrow", 34), h("span", { class: "b" }, fmt(d.utilisables)), h("span", { style: "color:var(--ink2)" }, "patients réellement analysables"));
-  const maxM = Math.max(1, ...d.groupes.flatMap((g) => [g.mediane_traite || 0, g.mediane_controle || 0]));
-  const groups = h("div", { class: "groups" }, d.groupes.map((g) => {
-    if (g.mediane_traite == null || g.mediane_controle == null) return h("div", { class: "panel-box group" }, h("h4", {}, `Marqueur ${g.statut}`), h("p", {}, "Effectif trop petit : masqué (moins de 5)."));
-    const pair = (lab, val, color, n) => h("div", { class: "pair" }, h("span", {}, `${lab} (${fmt(n)})`), h("div", { class: "bar" }, h("i", { style: `width:${(100 * val) / maxM}%;background:${color}` })), h("span", { class: "val num" }, `${String(val).replace(".", ",")} mois`));
-    return h("div", { class: "panel-box group" }, h("h4", {}, `Marqueur ${g.statut} : gain de ${String(g.gain_mois > 0 ? "+" + g.gain_mois : g.gain_mois).replace(".", ",")} mois`),
-      pair("Avec traitement", g.mediane_traite, "var(--cobalt)", g.n_traite), pair("Sans traitement", g.mediane_controle, "#9aa5b8", g.n_controle),
-      h("p", { class: "t-sub", style: "font-family:inherit;margin-top:8px" }, "Survie médiane."));
-  }));
-  const st = d.statistique, c = d.essai_confirmation;
-  return h("div", {},
-    viewHead("Patients de l'essai interne", "Chaque patient monte cinq marches, de prévu à complet. Seuls ceux qui arrivent en haut comptent."),
-    h("p", { class: "note", style: "display:inline-block;margin:0 0 18px" }, "Données fictives générées par programme. Aucun patient réel."),
-    head, h("div", { class: "panel-box" }, funnelBars(d, true)),
-    h("section", { class: "section" }, h("h3", {}, "Effet du traitement selon le statut du marqueur"), h("p", { class: "sub" }, "Descriptif sur données fabriquées : ce n'est pas un test statistique."), groups),
-    h("section", { class: "section" }, h("h3", {}, "Faut-il plus de patients ?"),
-      h("p", { class: "sub" }, `Pour détecter une différence d'effet entre les deux statuts, il faut environ ${fmt(st.evenements_necessaires_par_groupe)} événements (décès ou rechutes) par groupe, avec une hypothèse d'effet de ${String(st.hr_hypothese).replace(".", ",")}.`),
+  const d = state.dossier, st = d.statistique, c = d.essai_confirmation;
+  return h("div", {}, viewHead("Patients de l'essai interne", "Les fiches d'essais fournissent des effectifs randomisés ; le comptage individuel n'est pas disponible."),
+    h("div", { class: "hero-num" }, h("span", { class: "b" }, "Non calculé"), h("p", { class: "d" }, d.raison_indetermination)),
+    h("section", { class: "section" }, h("h3", {}, "Exigence statistique de l'hypothèse"),
+      h("p", { class: "sub" }, `${fmt(st.evenements_necessaires_total)} événements nécessaires au total pour l'interaction. Ce nombre n'est pas un effectif observé.`),
       h("div", { class: "panel-box" }, h("dl", { class: "doc kv", style: "max-width:none" },
-        h("dt", {}, "Événements observés"), h("dd", { class: "num" }, Object.entries(st.evenements_internes).map(([k, v]) => `${k} : ${fmt(v)}`).join("   ")),
-        h("dt", {}, "Verdict"), h("dd", {}, st.suffisant ? "Suffisant" : "Insuffisant sur l'essai interne"),
-        h("dt", {}, "Essai de confirmation"), h("dd", { class: "num" }, `environ ${fmt(c.evenements_tous)} événements pour tous les patients, ${fmt(c.evenements_selectionnes)} s'il est réservé au sous-groupe ciblé`)))),
-  );
+        h("dt", {}, "Effets attendus (hypothèses)"), h("dd", {}, `HR+ : ${shown(st.hypotheses.hr_x_plus)} ; HR− : ${shown(st.hypotheses.hr_x_moins)}`),
+        h("dt", {}, "Événements individuels observés"), h("dd", {}, "Non calculés"),
+        h("dt", {}, "Essai de confirmation"), h("dd", {}, `${fmt(c.evenements_tous)} événements ouvert à tous, ${fmt(c.evenements_selectionnes)} réservé au sous-groupe ciblé`)))));
 }
 
 function dossierView() {
-  const d = state.dossier, v = d.verdict, st = d.statistique, c = d.essai_confirmation, g = d.gain;
+  const d = state.dossier, st = d.statistique, c = d.essai_confirmation;
   const link = `/api/dossier.md?question=${encodeURIComponent(state.question)}`;
-  return h("div", {},
-    viewHead("Dossier de faisabilité", d.question, h("div", { style: "margin-top:16px" }, h("a", { class: "btn btn-primary btn-small", href: link, download: "dossier_trialrevive.md", style: "display:inline-flex;gap:8px;align-items:center;text-decoration:none" }, icon("download", 16), "Télécharger en Markdown"))),
+  const listGroup = (key, title) => {
+    const rows = d[key].map((t) => h("li", {},
+      t.lien ? h("a", { href: t.lien, target: "_blank", rel: "noopener" }, labelOf(t)) : labelOf(t),
+      ` : ${t.titre} (${fmt(t.nb_patients)} patients randomisés, preuve ${shown(t.E)}, voie ${shown(t.R)})`,
+      h("ul", {}, t.gains.map((g) => h("li", {}, `${g.code} : ${g.libelle}`)))));
+    return [h("h3", {}, `${title} (${d[key].length})`), h("ul", {}, rows)];
+  };
+  return h("div", {}, viewHead("Dossier de faisabilité", d.question, h("div", { style: "margin-top:16px" },
+    h("a", { class: "btn btn-primary btn-small", href: link, download: "dossier_trialrevive.md", style: "display:inline-flex;gap:8px;align-items:center;text-decoration:none" }, icon("download", 16), "Télécharger en Markdown"))),
     h("div", { class: "doc panel-box" },
-    h("h3", {}, "Verdict"),
-    h("dl", { class: "kv" },
-      h("dt", {}, "Voie (R)"), h("dd", {}, `${v.R} : ${v.R_texte}`),
-      h("dt", {}, "Preuve atteignable (E)"), h("dd", {}, `${v.E} : ${v.E_texte}`),
-      h("dt", {}, "Gains possibles (G)"), h("dd", {}, v.G.map((x) => `${x.code} ${x.gain}`).join(" ; "))),
-    h("p", {}, v.E_pourquoi + "."),
-    h("h3", {}, `Essais retenus (${d.retenus.length})`),
-    h("ul", {}, d.retenus.map((t) => h("li", {}, h("a", { href: t.lien, target: "_blank", rel: "noopener" }, t.nct_id), ` : ${t.titre} (${fmt(t.nb_patients)} patients, preuve ${t.E}, ${t.niveau === "direct" ? "médicament exact" : "même classe"})`))),
-    h("h3", {}, `Essais écartés (${d.ecartes.length})`),
-    h("ul", {}, Object.entries(d.rejection.ecartes_par_etape).filter(([, n]) => n > 0).map(([k, n]) => h("li", {}, `${k} : ${n}`))),
-    h("h3", {}, "Comment obtenir la réponse"),
-    h("p", {}, d.methode),
-    h("p", {}, `Exigence statistique : ${fmt(st.evenements_necessaires_par_groupe)} événements par groupe (hypothèse d'effet ${String(st.hr_hypothese).replace(".", ",")}). Essai interne : ${st.suffisant ? "suffisant" : "insuffisant"}.`),
-    h("p", {}, `Essai de confirmation : environ ${fmt(c.evenements_tous)} événements pour tous les patients, contre ${fmt(c.evenements_selectionnes)} s'il est réservé au sous-groupe ciblé.`),
-    h("h3", {}, "Gain attendu"),
-    h("p", {}, `${g.pct_sauvage ?? "—"} % de patients au statut sauvage parmi les patients complets. Gain de survie médiane : ${g.gain_sauvage_mois ?? "—"} mois pour le statut sauvage, ${g.gain_mute_mois ?? "—"} mois pour le statut muté. ${g.note}`),
-    h("h3", {}, "Sources"),
-    h("ul", {}, d.sources.map((x) => h("li", {}, h("a", { href: x.lien, target: "_blank", rel: "noopener" }, x.nct_id),
-      x.reanalyse && [" : ", x.publication_lien ? h("a", { href: x.publication_lien, target: "_blank", rel: "noopener" }, x.reanalyse) : x.reanalyse, x.reanalyse_verifiee ? " (vérifiée)" : " (à vérifier)"]))),
-    h("h3", {}, "Limites"), h("ul", {}, d.limites.map((x) => h("li", {}, x))),
-    ),
-  );
+      h("h3", {}, "Verdicts par essai"), h("p", {}, d.verdict.E_pourquoi),
+      listGroup("internes", "Essais internes retenus"), listGroup("externes", "Essais externes retenus"),
+      h("h3", {}, `Essais exclus (${d.ecartes.length})`), h("ul", {}, d.ecartes.map((t) => h("li", {}, `${labelOf(t)} : ${t.raison}`))),
+      h("h3", {}, `Fiches à compléter (${d.a_completer.length})`), h("ul", {}, d.a_completer.map((t) => h("li", {}, `${labelOf(t)} : ${t.champs_manquants.join(", ")}`))),
+      h("h3", {}, `Essais en cours (${d.en_cours.length})`), h("ul", {}, d.en_cours.map((t) => h("li", {}, `${labelOf(t)} : ${t.motif}`))),
+      h("h3", {}, "Données internes"), h("p", {}, d.raison_indetermination),
+      h("h3", {}, "Exigence statistique"), h("p", {}, `${fmt(st.evenements_necessaires_total)} événements nécessaires au total pour l'interaction, selon les hypothèses de la SEH.`),
+      h("p", {}, `Essai de confirmation : ${fmt(c.evenements_tous)} événements ouvert à tous ; ${fmt(c.evenements_selectionnes)} réservé au sous-groupe ciblé.`),
+      h("h3", {}, "Sources"), h("ul", {}, d.sources.map((t) => h("li", {}, t.lien ? h("a", { href: t.lien, target: "_blank", rel: "noopener" }, labelOf(t)) : labelOf(t), referenceList(t.references)))),
+      h("h3", {}, "Limites"), h("ul", {}, d.limites.map((t) => h("li", {}, t)))));
 }
 
 function guideView() {
   const step = (n, art, title, text) => h("li", { class: "gstep" }, h("span", { class: "gart", html: ART[art] }),
     h("div", {}, h("h3", {}, h("span", { class: "gnum num" }, n), title), h("p", {}, text)));
-  return h("div", {},
-    pageHead("Comment ça marche", "TrialRevive transforme une question scientifique en dossier de faisabilité, en quatre étapes.", ["man", "doctor", "nurse"]),
+  return h("div", {}, pageHead("Comment ça marche", "Une hypothèse structurée, des fiches d'essais et un dossier de faisabilité.", ["man", "doctor", "nurse"]),
     h("ol", { class: "gsteps" },
-      step(1, "clipboard", "Vous posez une question", "Par exemple : le statut KRAS change-t-il l'effet du panitumumab ? La question devient une liste d'exigences précises : tirage au sort, médicament, marqueur mesuré."),
-      step(2, "molecule", "Il trie les essais publics", "Chaque essai de ClinicalTrials.gov est comparé aux exigences. Ceux qui ne conviennent pas sont écartés, et la raison de chaque écart est conservée."),
-      step(3, "tubes", "Il compte les patients utilisables", "Sur un essai interne fictif, chaque patient monte cinq marches : prévu, collecté, existant, utilisable, complet. Seuls les patients complets comptent."),
-      step(4, "heart", "Il rend un dossier sourcé", "Trois notes (R, E, G), la taille du prochain essai, des sources cliquables et les limites. Chaque chiffre vient du calcul, rien n'est écrit par une IA.")),
-    h("section", { class: "section" }, h("h3", {}, "Lire les trois notes"),
-      h("div", { class: "panel-box" }, h("dl", { class: "doc kv", style: "max-width:none;margin:0" },
-        h("dt", {}, "R : la voie"), h("dd", {}, "Comment obtenir la réponse. R0 veut dire que le marqueur est déjà mesuré dans les données."),
-        h("dt", {}, "E : la preuve"), h("dd", {}, "La force de preuve atteignable, de E0 (non testable) à E4 (confirmée dans un second essai). Atteignable ne veut pas dire acquise."),
-        h("dt", {}, "G : le gain"), h("dd", {}, "Ce que la réponse apporte : mieux cibler les patients, un essai de confirmation plus petit, un test diagnostique associé.")))),
-    h("section", { class: "section" }, h("h3", {}, "Ce qui n'est pas encore validé"),
-      h("div", { class: "panel-box" }, h("ul", { class: "plain" },
-        h("li", {}, "Les patients de l'essai interne sont fictifs : aucun patient réel n'est utilisé."),
-        h("li", {}, "Les références des six articles sont rattachées au registre, mais leurs chiffres restent à vérifier par une personne du domaine."),
-        h("li", {}, "La fiche de la question n'est pas encore validée par un clinicien."),
-        h("li", {}, "Seul le marqueur KRAS est pris en charge."),
-        h("li", {}, "La comparaison avec une IA généraliste n'a pas encore été menée : importez une vraie réponse pour la voir.")))),
-  );
+      step(1, "clipboard", "Choisir une hypothèse", "Le cas proposé correspond à une fiche SEH déjà configurée. La traduction automatique des questions libres n'est pas disponible."),
+      step(2, "molecule", "Comparer les essais", "Le moteur applique les exigences, les tolérances et la puissance a priori. Les essais internes et externes sont classés séparément."),
+      step(3, "tubes", "Distinguer les statuts", "Retenu, exclu, à compléter ou en cours : chaque résultat conserve son statut. Le comptage individuel S0 à S4 n'est pas encore calculé."),
+      step(4, "heart", "Lire le dossier", "Les voies, niveaux de preuve atteignables, gains et conditions sont fournis par essai. Aucun verdict global n'est ajouté.")),
+    h("section", { class: "section" }, h("h3", {}, "Ce qui reste à valider"), h("div", { class: "panel-box" }, h("ul", { class: "plain" },
+      h("li", {}, "Les paramètres scientifiques et les sources doivent être relus par l'équipe Science."),
+      h("li", {}, "Une valeur de couverture ou d'événements prévue n'est pas une observation clinique."),
+      h("li", {}, "Les jeux de démonstration sont fictifs. Aucun patient réel n'est utilisé."),
+      h("li", {}, "La comparaison IA utilise uniquement des réponses réellement importées.")))));
 }
 
 async function comparisonView() {
@@ -469,7 +422,7 @@ async function comparisonView() {
         h("h4", { style: "margin:20px 0 8px;font:650 1rem var(--display)" }, "Réponse brute, intégrale"),
         h("textarea", { class: "raw", readonly: true, "aria-label": "Réponse brute de l'IA" }, rec.reponse_ia),
         h("h4", { style: "margin:20px 0 8px;font:650 1rem var(--display)" }, "Numéros NCT cités"),
-        h("p", { class: "t-sub", style: "font-family:inherit;margin-bottom:8px" }, "Retrouver un essai dans le cache ne valide ni les chiffres, ni la conclusion. Un NCT absent du cache peut exister."),
+        h("p", { class: "t-sub", style: "font-family:inherit;margin-bottom:8px" }, "Retrouver un essai dans les fiches chargées ne valide ni les chiffres, ni la conclusion. Un NCT absent peut exister."),
         r.nct.length ? h("div", { class: "table-wrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["NCT cité", "Cache local", "Titre du registre", "Lien"].map((k) => h("th", {}, k)))),
           h("tbody", {}, r.nct.map((n) => h("tr", {}, h("td", { class: "num" }, n["NCT cité"]), h("td", {}, n["Cache local"]), h("td", {}, n["Titre du registre"]),
             h("td", {}, h("a", { href: n["Lien"], target: "_blank", rel: "noopener" }, "Ouvrir"))))))) : h("p", {}, "Aucun numéro NCT détecté : les autres références restent à vérifier."),
@@ -511,6 +464,7 @@ async function comparisonView() {
 function setAlert(text) { const a = $("#alert"); a.textContent = text || ""; a.hidden = !text; }
 
 function setBusy(on) {
+  $("#progress").hidden = !on;
   document.querySelectorAll(".ask button[type=submit]").forEach((b) => { b.disabled = on; b.textContent = on ? "Analyse…" : "Analyser"; });
   document.querySelectorAll(".finder-go").forEach((b) => { b.disabled = on; });
 }
@@ -521,14 +475,13 @@ async function run(text) {
   if (state.loading) return;
   state.loading = true; setAlert("");
   setBusy(true);
-  const opening = route() === "accueil" && capsule ? capsule.open() : Promise.resolve();
   try {
-    const [res] = await Promise.all([api("/api/analyze", { question: text }), opening]);
+    const res = await api("/api/analyze", { question: text });
     Object.assign(state, { dossier: res.dossier, markdown: res.markdown, question: text, example: res.exemple });
     $("#qCompact").value = text;
     if (route() === "apercu") render(); else location.hash = "#/apercu";
   } catch (e) {
-    capsule?.close(); setAlert(e.message);
+    setAlert(e.message);
   } finally {
     state.loading = false;
     setBusy(false);
@@ -538,7 +491,7 @@ async function run(text) {
 function renderNav(current) {
   const d = state.dossier;
   $("#nav").replaceChildren(...Object.entries(ROUTES).map(([id, [label, ic]]) => {
-    const count = d && id === "essais" ? d.retenus.length : d && id === "ecartes" ? d.ecartes.length : null;
+    const count = d && id === "essais" ? d.retenus.length : d && id === "ecartes" ? d.ecartes.length : d && id === "completer" ? d.a_completer.length : d && id === "encours" ? d.en_cours.length : null;
     return h("li", {}, h("a", { href: `#/${id}`, "aria-current": current === id ? "page" : null }, icon(ic, 19), h("span", {}, label), count != null && h("span", { class: "count num" }, count)));
   }));
 }
@@ -548,13 +501,12 @@ async function render() {
   const r = route();
   document.body.dataset.state = r === "accueil" ? "landing" : "work";
   renderNav(r);
-  if (r !== "accueil") { capsule?.dispose(); capsule = null; }
   const main = $("#main");
   let view;
   if (r === "accueil") view = landing();
   else if (!ROUTES[r]) view = emptyState("Cette page n'existe pas", "Revenez à l'accueil pour poser une question.");
   else if (!state.dossier && r !== "guide") view = emptyState("Aucune analyse pour le moment", "Posez une question, ou lancez le cas de démonstration : les essais, les patients et le dossier apparaîtront ici.");
-  else view = { apercu: overview, essais: trialsView, ecartes: rejectedView, patients: patientsView, dossier: dossierView, comparaison: comparisonView, guide: guideView }[r]();
+  else view = { apercu: overview, essais: trialsView, ecartes: rejectedView, completer: () => pendingView("a_completer"), encours: () => pendingView("en_cours"), patients: patientsView, dossier: dossierView, comparaison: comparisonView, guide: guideView }[r]();
   const node = await view;
   main.replaceChildren(node);
   document.title = r === "accueil" ? "TrialRevive" : `${ROUTES[r]?.[0] ?? "Page introuvable"} | TrialRevive`;
@@ -570,4 +522,8 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "/" && !/input|textarea/i.test(document.activeElement.tagName)) { e.preventDefault(); ($("#finder") || $("#qCompact")).focus(); }
 });
 addEventListener("hashchange", render);
-api("/api/info").then((i) => { state.example = i.exemple; $("#qCompact").placeholder = "Posez une question scientifique"; }).catch(() => {}).finally(render);
+api("/api/info").then((i) => {
+  state.example = i.exemple; state.questions = i.questions; state.source = i.source; state.fictitious = i.donnees_fictives;
+  $("#qCompact").placeholder = "Choisissez une hypothèse proposée";
+  $("#sourceMode").textContent = i.donnees_fictives ? "Démonstration fictive" : i.source === "postgres" ? "Source : PostgreSQL" : "Source : fichier fourni";
+}).catch((e) => setAlert(e.message)).finally(render);

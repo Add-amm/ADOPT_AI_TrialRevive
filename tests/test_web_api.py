@@ -12,8 +12,12 @@ import requests
 import uvicorn
 
 import server
-from src import compare, dossier, engine, fake_data, question
-from web_adapter import adapt_dossier, analyze, json_value
+from src import compare
+from frontend_matcher import BackendFrontendService, BACKEND
+from web_adapter import adapt_dossier, json_value
+
+DEMO = BackendFrontendService(fiches=BACKEND / "data/fiches_essais_fictives.json")
+EXAMPLE = DEMO.info()["exemple"]
 
 
 @contextlib.contextmanager
@@ -45,44 +49,51 @@ def running_app(app):
 @pytest.fixture(scope="module")
 def web_api(tmp_path_factory):
     directory = tmp_path_factory.mktemp("web-baselines")
-    with running_app(server.create_app(baseline_dir=directory)) as base:
+    with running_app(server.create_app(baseline_dir=directory, service=DEMO)) as base:
         yield base, directory
 
 
 @pytest.fixture
 def record():
-    return {"question": question.CAS_VEDETTE_TEXTE,
+    return {"question": EXAMPLE,
             "modele": "Fixture de test uniquement", "date": "2026-11-14",
             "reponse_ia": "  NCT00364013 et NCT99999999.\n<script>window.injected=true</script>\n"}
 
 
-def test_routes_use_our_pipeline_without_changing_business_results(web_api):
+def test_routes_use_the_existing_backend_without_recalculating_results(web_api, tmp_path):
+    import subprocess
+    import sys
+
     base, _ = web_api
-    card = question.parse_question(question.CAS_VEDETTE_TEXTE)
-    screening = engine.screen_trials(card, engine.load_cvs())
-    usable = engine.count_usable(fake_data.load(), card)
-    raw = dossier.build_dossier(card, screening, engine.rejection_summary(screening), usable,
-                                engine.group_summary(usable["data"], card))
-    response = requests.post(base + "/api/analyze", json={"question": card["question"]}, timeout=5)
+    output = tmp_path / "raw-backend.json"
+    subprocess.run([sys.executable, str(BACKEND / "matcher.py"),
+                    str(BACKEND / "data/seh_kras_2009.json"),
+                    str(BACKEND / "data/fiches_essais_fictives.json"), str(output)],
+                   cwd=BACKEND, capture_output=True, check=True)
+    raw = json.loads(output.read_text())
+    response = requests.post(base + "/api/analyze", json={"question": EXAMPLE}, timeout=10)
     assert response.status_code == 200
     data = response.json()
-    assert data["exemple"] == card["question"]
-    assert data["markdown"] == dossier.to_markdown(raw)
-    # La passerelle n'ajoute que des champs inconnus ; chaque valeur calculée reste identique.
-    def included(expected, actual):
-        if isinstance(expected, dict):
-            for key, value in expected.items():
-                included(value, actual[key])
-        elif isinstance(expected, list):
-            assert len(expected) == len(actual)
-            for x, y in zip(expected, actual):
-                included(x, y)
-        else:
-            assert expected == actual
-    included(json_value(raw), data["dossier"])
+    assert data["resultat_backend"] == raw
     d = data["dossier"]
-    assert d["rejection"]["total"] == 104 and len(d["retenus"]) == 6 and d["utilisables"] == 252
-    assert d["verdict"]["preuve_verifiee"] is False
+    assert d["backend"] == "Backend/matcher.py"
+    assert d["rejection"]["total"] == 8 and len(d["internes"]) == 1 and len(d["externes"]) == 2
+    assert len(d["ecartes"]) == 5
+    assert d["utilisables"] is None and d["entonnoir"] == [] and d["groupes"] == []
+    assert d["verdict"]["E"] is None and d["verdict"]["R"] is None and d["verdict"]["G"] == []
+    assert d["statistique"]["evenements_necessaires_total"] == raw["exigence_statistique"]["evenements_min"]
+    assert d["statistique"]["evenements_necessaires_par_groupe"] is None
+    assert [r["trial_id"] for r in d["internes"]] == [r["trial_id"] for r in raw["internes"]]
+    assert [r["trial_id"] for r in d["externes"]] == [r["trial_id"] for r in raw["externes"]]
+    for source, target in zip(raw["internes"] + raw["externes"], d["retenus"]):
+        assert target["score"] == source["score_compatibilite"]
+        assert target["E"] == source["niveau_preuve_atteignable"]
+        assert target["conditions"] == source["conditions_restantes"]
+        assert target["gains"] == source["gains"]
+        assert target["references"] == source["sources"]
+    assert all(s["lien"] is None for s in d["sources"])  # identifiants fictifs, aucun NCT inventé
+    assert "206 événements nécessaires au total" in data["markdown"]
+    assert "252" not in data["markdown"]
 
 
 def test_adapter_never_fabricates_numbers_sources_or_validation():
@@ -109,12 +120,14 @@ def test_strict_json_converts_numpy_and_missing_floats():
 
 def test_info_and_download_match_the_same_analysis(web_api):
     base, _ = web_api
-    assert requests.get(base + "/api/info", timeout=5).json() == {"exemple": question.CAS_VEDETTE_TEXTE}
-    r = requests.get(base + "/api/dossier.md", params={"question": question.CAS_VEDETTE_TEXTE}, timeout=5)
+    info = requests.get(base + "/api/info", timeout=5).json()
+    assert info["exemple"] == EXAMPLE and info["backend"] == "Backend/matcher.py"
+    assert info["source"] == "fichier" and info["donnees_fictives"] is True
+    r = requests.get(base + "/api/dossier.md", params={"question": EXAMPLE}, timeout=5)
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/markdown")
     assert "attachment" in r.headers["content-disposition"]
-    assert r.text == analyze(question.CAS_VEDETTE_TEXTE)["markdown"]
+    assert r.text == DEMO.analyze(EXAMPLE)["markdown"]
 
 
 @pytest.mark.parametrize("payload", [None, [], "texte", {}, {"question": ""}, {"question": 123},
@@ -135,12 +148,10 @@ def test_malformed_and_oversized_requests_are_rejected(web_api):
     assert r.status_code == 413 and "volumineuse" in r.json()["error"]
 
 
-def test_other_drug_does_not_invent_an_internal_arm(web_api):
+def test_free_question_does_not_silently_replace_the_structured_hypothesis(web_api):
     base, _ = web_api
     r = requests.post(base + "/api/analyze", json={"question": "Le statut KRAS change-t-il l'effet du cetuximab ?"}, timeout=5)
-    assert r.status_code == 200
-    d = r.json()["dossier"]
-    assert d["utilisables"] is None and "aucun bras cetuximab" in d["raison_indetermination"]
+    assert r.status_code == 400 and "SEH structurée" in r.json()["error"]
 
 
 def test_validate_archive_list_compare_are_lossless_and_isolated(web_api, record):
@@ -160,7 +171,7 @@ def test_validate_archive_list_compare_are_lossless_and_isolated(web_api, record
     d = out.json()
     assert d["meme_question"] is True and d["rows"][0]["IA généraliste (évaluation déclarée)"] == "Non évalué"
     ncts = {row["NCT cité"]: row["Cache local"] for row in d["nct"]}
-    assert ncts["NCT00364013"] == "Présent" and ncts["NCT99999999"].startswith("Absent")
+    assert ncts["NCT00364013"].startswith("Absent") and ncts["NCT99999999"].startswith("Absent")
     other = {**record, "question": "Question différente"}
     out = requests.post(base + "/api/compare", json={"question": record["question"], "record": other}, timeout=5).json()
     assert out["meme_question"] is False
@@ -203,7 +214,7 @@ def test_backend_failure_does_not_leak_internal_details():
         raise RuntimeError("private implementation detail")
     with running_app(server.create_app(analyze=unavailable)) as base:
         for path in ("/api/analyze", "/api/compare"):
-            body = {"question": question.CAS_VEDETTE_TEXTE,
+            body = {"question": EXAMPLE,
                     "record": {"question": "test", "reponse_ia": "test", "modele": "test", "date": "2026-11-14"}}
             r = requests.post(base + path, json=body, timeout=5)
             assert r.status_code == 503 and "private implementation" not in r.text

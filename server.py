@@ -1,7 +1,7 @@
-"""Passerelle HTTP locale pour le nouveau front, branchée sur NOTRE backend.
+"""Passerelle de présentation du front, branchée sur Backend/matcher.py.
 
 Lancer : python server.py [port] (8000 par défaut). Streamlit reste indépendant.
-Ni téléchargement de données, ni extraction IA, ni modification de src/ au démarrage.
+Ni téléchargement de données, ni extraction IA, ni modification du backend au démarrage.
 """
 import json
 import logging
@@ -14,8 +14,9 @@ from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from src import compare, question
+from src import compare
 import web_adapter
+from frontend_matcher import BackendFrontendService, BackendUnavailable
 
 ROOT = Path(__file__).resolve().parent
 MAX_BODY = 2_000_000
@@ -80,10 +81,11 @@ class LocalResponses(BaseHTTPMiddleware):
             response = error(str(exc), exc.status)
         except ValueError as exc:
             response = error(str(exc))
+        except BackendUnavailable as exc:
+            response = error(str(exc), 503)
         except Exception:
             logger.exception("Échec de la passerelle web")
-            response = error("Service indisponible. Vérifiez la base avec « python -m src.fetch --offline » "
-                             "puis « python -m src.cv ».", 503)
+            response = error("Service indisponible. Vérifiez la configuration Backend/.env et les dépendances du serveur.", 503)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cache-Control"] = "no-cache"
@@ -97,13 +99,14 @@ class LocalResponses(BaseHTTPMiddleware):
         return response
 
 
-def create_app(*, baseline_dir=None, analyze=None):
+def create_app(*, baseline_dir=None, analyze=None, service=None):
     """Fabrique injectant seulement les accès de bordure pour les tests."""
     baseline_dir = Path(baseline_dir) if baseline_dir is not None else compare.BASELINE_DIR
-    analyze = analyze or web_adapter.analyze
+    service = service or BackendFrontendService()
+    analyze = analyze or service.analyze
 
     async def info(request):
-        return Json({"exemple": question.CAS_VEDETTE_TEXTE})
+        return Json(service.info())
 
     async def analyze_route(request):
         payload = await read_json(request)
@@ -111,7 +114,7 @@ def create_app(*, baseline_dir=None, analyze=None):
         return Json(await run_in_threadpool(analyze, text))
 
     async def dossier_md(request):
-        text = question_text(request.query_params.get("question") or question.CAS_VEDETTE_TEXTE)
+        text = question_text(request.query_params.get("question") or service.info()["exemple"])
         result = await run_in_threadpool(analyze, text)
         return Response(result["markdown"], media_type="text/markdown; charset=utf-8",
                         headers={"Content-Disposition": 'attachment; filename="dossier_trialrevive.md"'})
@@ -142,11 +145,11 @@ def create_app(*, baseline_dir=None, analyze=None):
     async def comparison(request):
         payload = await read_json(request)
         record = baseline_record(payload.get("record"))
-        text = question_text(payload.get("question", question.CAS_VEDETTE_TEXTE))
+        text = question_text(payload.get("question", service.info()["exemple"]))
         result = await run_in_threadpool(analyze, text)
         d = result["dossier"]
-        nct = await run_in_threadpool(compare.audit_nct_references, record["reponse_ia"])
-        return Json({"rows": compare.comparison_rows(d, record),
+        nct = await run_in_threadpool(service.audit_nct, record["reponse_ia"], text)
+        return Json({"rows": service.comparison_rows(d, record),
                      "meme_question": compare.same_question(d["question"], record["question"]), "nct": nct})
 
     async def index(request):
@@ -180,5 +183,16 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("port", nargs="?", type=int, default=8000)
+    parser.add_argument("--source", choices=("postgres", "fichier"), default="postgres")
+    parser.add_argument("--fiches", type=Path, help="fiches JSON pour le mode fichier explicite")
+    parser.add_argument("--seh", type=Path, help="hypothèse structurée à proposer dans le front")
+    parser.add_argument("--corpus", help="filtre de corpus PostgreSQL")
     args = parser.parse_args()
-    uvicorn.run(app, host="127.0.0.1", port=args.port)
+    if args.source == "fichier" and args.fiches is None:
+        parser.error("--source fichier nécessite --fiches ; aucun repli automatique vers la démo.")
+    if args.source == "postgres" and args.fiches is not None:
+        parser.error("--fiches nécessite --source fichier.")
+    if args.source == "fichier" and args.corpus:
+        parser.error("--corpus concerne la source PostgreSQL.")
+    service = BackendFrontendService(fiches=args.fiches, seh=args.seh, corpus=args.corpus)
+    uvicorn.run(create_app(service=service), host="127.0.0.1", port=args.port)

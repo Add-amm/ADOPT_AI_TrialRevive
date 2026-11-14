@@ -64,3 +64,12 @@ Veille automatique de littérature et notifications push, horloge commune des da
 - Préparé le dossier de revue des six articles, les liens DOI et les limites de la validation.
 - Corrigé les résultats trompeurs sur les marqueurs non disponibles et sur un traitement absent de l'essai interne.
 - Préparé les cinq diapositives, le pitch à jour et l'export de secours ; contrôles automatiques ci-dessus. Restes humains conservés ouverts.
+
+## Front relié au dossier Backend (14 novembre 2026)
+
+- Front de CBUM05-dev, branche `nouveau-front`, révision `efd42e7` intégré avec Manrope, logos et charte du coéquipier.
+- Appel du vrai `Backend/matcher.py` par un adaptateur de présentation extérieur au dossier ; les 19 fichiers Backend suivis restent identiques.
+- Classements internes/externes, exclusions, fiches à compléter et essais en cours conservés ; pas de verdict global ni de patients S4 inventés.
+- PostgreSQL par défaut ; mode fichier fictif uniquement sur choix explicite. Connexion distante non validée dans le cloud.
+- 91 tests du site réussis ; 52 tests Backend existants réussis avant intégration. Parcours Chromium et téléchargement du dossier validés, sans ressource distante.
+- Site de démonstration démarré sur le port 8766 ; détails et commandes dans `docs/INTEGRATION_FRONT.md`.
