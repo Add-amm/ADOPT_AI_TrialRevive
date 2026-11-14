@@ -3,10 +3,12 @@
 Principe : l'IA propose les fiches, ce code tranche. Tout verdict vient de règles
 écrites ici, et chaque écart produit une phrase d'explication.
 
-Usage : python matcher.py data/seh_kras_2009.json data/fiches_essais_fictives.json
+Usage : python matcher.py  (PostgreSQL par défaut)
+        python matcher.py data/seh_kras_2009.json data/fiches_essais_fictives.json
 """
 import json
-import sys
+import argparse
+from pathlib import Path
 
 import stats
 
@@ -335,11 +337,41 @@ def resume(res):
     return "\n".join(lignes)
 
 
-if __name__ == "__main__":
-    seh = json.load(open(sys.argv[1]))
-    fiches = json.load(open(sys.argv[2]))
+def main(argv=None):
+    racine = Path(__file__).resolve().parent
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("seh", nargs="?", type=Path, default=racine / "data" / "seh_kras_2009.json")
+    ap.add_argument("fiches", nargs="?", type=Path, help="ancien mode : fiches JSON explicites")
+    ap.add_argument("resultat", nargs="?", type=Path, help="ancien chemin de sortie optionnel")
+    ap.add_argument("--source", choices=("postgres", "fichier"), help="PostgreSQL par défaut si aucun fichier n'est fourni")
+    ap.add_argument("--corpus", help="filtre du corpus pour la source PostgreSQL")
+    ap.add_argument("--sortie", type=Path, help="fichier du résultat")
+    a = ap.parse_args(argv)
+    source = a.source or ("fichier" if a.fiches is not None else "postgres")
+    if source == "postgres" and a.fiches is not None:
+        ap.error("Ne fournissez pas de fichier de fiches avec --source postgres.")
+    if source == "fichier" and a.fiches is None:
+        ap.error("--source fichier nécessite un fichier de fiches JSON explicite.")
+    if source == "fichier" and a.corpus:
+        ap.error("--corpus s'applique à la source PostgreSQL ; filtrez le fichier explicitement.")
+    from source_postgres import ErreurPostgres
+
+    try:
+        seh = json.loads(a.seh.read_text(encoding="utf-8"))
+        if source == "postgres":
+            from adaptateur_base import charger_fiches
+            fiches = charger_fiches(corpus=a.corpus)
+        else:
+            fiches = json.loads(a.fiches.read_text(encoding="utf-8"))
+    except (ErreurPostgres, OSError, ValueError) as exc:
+        ap.exit(1, f"Chargement impossible : {exc}\n")
     res = apparier(seh, fiches)
-    out = sys.argv[3] if len(sys.argv) > 3 else "resultat_appariement.json"
-    json.dump(res, open(out, "w"), ensure_ascii=False, indent=2)
+    out = a.sortie or a.resultat or racine / "outputs" / "resultat_appariement.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8")
     print(resume(res))
     print(f"\nRésultat complet : {out}")
+
+
+if __name__ == "__main__":
+    main()
