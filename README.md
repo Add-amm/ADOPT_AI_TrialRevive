@@ -1,5 +1,26 @@
 # TrialRevive
 
+## Site web relié au dossier Backend
+
+Le front de `CBUM05-dev/ADOPT_AI_TrialRevive`, branche `nouveau-front` (révision `efd42e7`), appelle maintenant **`Backend/matcher.py`** via un adaptateur de présentation. Le dossier `Backend/` reste inchangé.
+
+```bash
+python -m pip install -r requirements-web.txt
+python server.py 8766
+```
+
+Par défaut, le backend lit PostgreSQL avec sa configuration habituelle (`Backend/.env` ou variables d'environnement). Si la base est inaccessible, l'erreur s'affiche ; aucune donnée fictive n'est chargée automatiquement.
+
+Pour lancer explicitement une démonstration hors ligne sur les fiches fictives fournies :
+
+```bash
+python server.py 8766 --source fichier --fiches Backend/data/fiches_essais_fictives.json
+```
+
+Le front conserve les classements internes/externes et les statuts exclus, à compléter et en cours. Les données patients et verdicts globaux absents du backend sont affichés comme non calculés. [Détails, écarts et vérifications](docs/INTEGRATION_FRONT.md).
+
+## Anciennes interfaces Streamlit
+
 Prototype de faisabilité sur des essais publics ClinicalTrials.gov et 400 patients **entièrement fictifs**. Cas de démonstration : panitumumab / KRAS dans le cancer colorectal. Les références et règles cliniques restent à valider par la personne Science ; la démo n'est pas un outil de décision clinique.
 
 ## Démarrage hors ligne après installation

@@ -1,4 +1,5 @@
 # Complément pour le site ; requirements.txt existant reste inchangé.
 -r requirements.txt
+-r Backend/requirements.txt
 starlette>=0.46,<2
 uvicorn>=0.30,<1
