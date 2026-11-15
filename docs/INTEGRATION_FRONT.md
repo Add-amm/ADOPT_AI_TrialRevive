@@ -2,7 +2,7 @@
 
 ## Résultat et périmètre
 
-Le site utilise le front de **CBUM05-dev/ADOPT_AI_TrialRevive**, branche **nouveau-front**, commit **efd42e7329df0a38f3142d2315b9b04ff2c48c96**. Il conserve son CSS, ses illustrations, sa police Manrope, ses licences et ses logos. L'ancienne 3D et les anciennes polices ne font pas partie de cette version du front.
+Le site utilise le front de **CBUM05-dev/ADOPT_AI_TrialRevive**, branche **nouveau-front**, commit **efd42e7329df0a38f3142d2315b9b04ff2c48c96**. Il conserve sa charte, ses illustrations, sa police Manrope, ses licences et ses logos. Les ajustements d'affichage sont détaillés ci-dessous. L'ancienne 3D et les anciennes polices ne font pas partie de cette version du front.
 
 L'intégration est développée sur `integration/front-backend-matcher`, depuis `a74e1d9` du dépôt utilisateur. Le dépôt distant a été inspecté dans un clone temporaire séparé ; aucun historique, moteur métier ou serveur de référence n'a été fusionné dans le projet.
 
@@ -63,7 +63,7 @@ Les processus du serveur doivent être redémarrés après modification de Pytho
 
 ## Vérifications exécutées
 
-- **91 tests dans `tests/` réussis**, dont les routes, l'adaptation du vrai backend, sept tests spécifiques de liaison, le parcours Chromium et les cinq garde-fous de charte.
+- L'intégration initiale a passé **91 tests dans `tests/`**, dont les routes, l'adaptation du vrai backend, sept tests spécifiques de liaison, le parcours Chromium et les cinq garde-fous de charte. La campagne complémentaire et ses résultats sont décrits ci-dessous.
 - **52 tests existants du dossier `Backend/` réussis**, avant l'intégration ; tous les fichiers du dossier sont restés identiques ensuite.
 - Comparaison JSON entre le résultat de la commande existante `Backend/matcher.py` et celui renvoyé sous `resultat_backend` par l'API : égalité exacte.
 - Les huit fiches fictives d'origine donnent **1 interne retenu, 2 externes retenus et 5 exclus**. L'exigence de la SEH est **206 événements au total**. Ce sont les sorties du backend, pas des résultats cliniques ajoutés par le front.
@@ -77,6 +77,38 @@ Les processus du serveur doivent être redémarrés après modification de Pytho
 
 Seuls `web/js/app.js` et `web/index.html` ont été adaptés au format des données : hypothèse proposée par l'API, source affichée, identifiants non NCT, classements internes/externes, deux nouveaux statuts, valeurs non calculées et unités statistiques correctes. La comparaison, les détails et le téléchargement sont reliés à ces résultats. L'affichage des données reste construit avec des nœuds texte ; `innerHTML` est réservé aux constantes SVG du front.
 
-**Aucune modification de `web/css/app.css`, `web/js/illustration.js`, des logos ou de Manrope par rapport au commit source.** Le test de charte fourni par le coéquipier est conservé et passe.
+**Illustrations, logos et Manrope sont identiques au commit source.** Les changements CSS concernent la correction mobile, le retrait des styles des cercles et l'allègement de l'aperçu décrits ci-dessous. Le test de charte fourni par le coéquipier est conservé et passe.
 
 Les limites métier du backend restent celles qu'il annonce : pas de comptage individuel ni de verdict global, hypothèse en brouillon et paramètres/sources à valider par l'équipe Science. Aucune connexion ou publication GitHub supplémentaire n'est annoncée comme effectuée sans vérification.
+
+## Contrôle complémentaire du front
+
+Le parcours à 390 pixels de large a révélé que le neuvième onglet (« Comment ça marche ») dépassait de la barre inférieure et ne pouvait pas être cliqué. La barre de navigation sous 1020 pixels est maintenant défilable horizontalement, avec une largeur minimale de 76 pixels par onglet. Aucun changement de couleur, de police, de logo ou du backend n'a été apporté.
+
+Deux tests Chromium de régression, à 390 et 820 pixels, parcourent les neuf onglets, vérifient leur visibilité après navigation et contrôlent l'absence de débordement horizontal de la page. Le rapport de la campagne complète est généré dans `outputs/verification/` (répertoire ignoré par Git).
+
+La campagne complète passe sans échec ni test ignoré : **93 tests dans `tests/`**, **52 dans `Backend/`** et **16 dans `trialrevive/`**, exécutés séparément pour éviter les collisions de noms de modules. Les parcours navigateur sur ordinateur, tablette et mobile, ainsi que les corpus vide et de 500 fiches fictives, aboutissent tous au dossier téléchargeable, sans erreur JavaScript ni requête distante.
+
+La connexion PostgreSQL réelle reste non validée : cet environnement ne dispose pas des identifiants et la résolution DNS des deux hôtes Supabase échoue. Le cas sans configuration renvoie bien HTTP 503, sans repli vers la démo. Les 19 fichiers suivis de `Backend/` sont toujours identiques à leur empreinte avant intégration.
+
+## Suppression des cercles (15 novembre 2026)
+
+À la demande de l'utilisateur, l'aperçu ne dessine plus un cercle par essai. Le total et la répartition des statuts restent dans l'en-tête ; les tableaux et les détails des essais restent dans leurs onglets. Aucun essai ni résultat n'est retiré des données.
+
+- `web/js/app.js` : retrait de la grille, de sa légende, des infobulles et de leur animation ; l'aperçu ne génère plus de nœud par essai.
+- `web/css/app.css` : suppression des styles propres à cette grille et aux infobulles.
+- `web/index.html` : suppression du conteneur d'infobulle devenu inutile.
+
+Les huit tests du navigateur et de la charte passent, ainsi que le contrôle de syntaxe JavaScript. Six parcours supplémentaires utilisent des réponses API fictives de 0, 8 et 19 364 essais sur ordinateur et mobile : l'aperçu conserve 73 éléments DOM et la même hauteur pour chaque taille de corpus à fenêtre identique, sans erreur JavaScript ni requête distante. L'ouverture d'une fiche depuis le tableau des essais retenus fonctionne toujours. Captures et mesures : `outputs/verification/sans-cercles/` (ignoré par Git). Le backend reste inchangé ; aucune connexion PostgreSQL réelle n'est impliquée dans ces contrôles.
+
+## Aperçu des résultats allégé (15 novembre 2026)
+
+La page de résultats conserve la question, trois compteurs (examinés, retenus et écartés), un aperçu de trois essais retenus au maximum et les actions d'ouverture et de téléchargement du dossier. Chaque fiche affiche son titre, son identifiant, son origine interne/externe et son niveau de preuve lorsqu'il est fourni. L'ordre des essais reçu est conservé ; « Tout voir » donne accès aux classements complets.
+
+Les trois cartes répétitives « Par essai » et le bloc des données patients non calculées ont été retirés de l'aperçu. Les conditions, sources, limites et informations patients restent accessibles dans les fiches, le dossier et les onglets correspondants. Les liens « À compléter » et « En cours » n'occupent la synthèse que si leurs effectifs sont non nuls. Un résultat sans essai retenu est indiqué explicitement.
+
+- `web/js/app.js` : remplacement des blocs de l'aperçu par cette synthèse ; les données et routes API restent identiques.
+- `web/css/app.css` : compteurs, liste courte et actions adaptés aux différentes tailles d'écran ; correction du débordement du formulaire de recherche à 320 pixels.
+- `tests/test_web_browser.py` : vérification du total dans son nouveau compteur.
+
+Vérification : **8 tests navigateur/charte réussis**, syntaxe JavaScript valide et huit parcours sur ordinateur/mobile avec des réponses fictives de 0, 8, 11 et 19 364 essais. Fiches ouvertes au clavier, statuts à compléter/en cours, liste complète, dossier et téléchargement fonctionnent ; aucune erreur JavaScript ni requête distante pendant ces parcours. Les ajustements visuels finaux ont aussi été contrôlés à 320, 390, 820 et 1440 pixels, avec des compteurs alignés et sans débordement, y compris l'affichage de 190 000 sur petit écran. Captures et mesures : `outputs/verification/resultats-epures/` (ignoré par Git). Backend inchangé.

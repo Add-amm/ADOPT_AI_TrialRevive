@@ -48,7 +48,7 @@ def test_demo_to_dossier_comparison_and_safe_dom_without_internet(tmp_path, rich
         # Le « Cas de démo » de la page d'accueil est une proposition de question.
         page.get_by_role("option").filter(has_text="Cas de démo").click()
         pw.expect(page).to_have_url(base + "/#/apercu")
-        pw.expect(page.locator("#main")).to_contain_text("11 essais examinés")
+        pw.expect(page.get_by_role("region", name="Chiffres clés").locator(".rpanel").first.locator(".v")).to_have_text("11")
         for label, heading in (("Essais retenus", "Essais retenus"), ("Essais écartés", "Essais écartés"),
                                ("À compléter", "À compléter"), ("En cours", "En cours"),
                                ("Patients", "Patients de l'essai interne"), ("Dossier", "Dossier de faisabilité")):
@@ -107,4 +107,31 @@ def test_demo_to_dossier_comparison_and_safe_dom_without_internet(tmp_path, rich
         assert any("/assets/brand/TrialRevive_logo_horizontal_noir.svg" in url for url in requested)
         assert not any("three.min.js" in url for url in requested)
         context.close()
+        browser.close()
+
+
+@pytest.mark.parametrize("width,height", [(390, 844), (820, 1180)])
+def test_every_navigation_tab_is_reachable_on_mobile_and_tablet(tmp_path, width, height):
+    executable = os.environ.get("TRIALREVIVE_CHROMIUM") or shutil.which("chromium") or shutil.which("google-chrome")
+    if not executable:
+        pytest.skip("Chromium absent ; renseigner TRIALREVIVE_CHROMIUM")
+    from frontend_matcher import BACKEND
+
+    service = BackendFrontendService(fiches=BACKEND / "data/fiches_essais_fictives.json")
+    with running_app(server.create_app(service=service, baseline_dir=tmp_path)) as base, pw.sync_playwright() as p:
+        browser = p.chromium.launch(executable_path=executable, headless=True,
+                                    args=["--no-sandbox", "--disable-dev-shm-usage"])
+        page = browser.new_page(viewport={"width": width, "height": height}, reduced_motion="reduce")
+        page.goto(base)
+        page.get_by_role("option").first.click()
+        pw.expect(page).to_have_url(base + "/#/apercu")
+        for route in ("apercu", "essais", "ecartes", "completer", "encours", "patients", "dossier", "comparaison", "guide"):
+            tab = page.locator(f'#nav a[href="#/{route}"]')
+            tab.click()
+            pw.expect(page).to_have_url(base + "/#/" + route)
+            pw.expect(tab).to_be_in_viewport()
+        if width == 390:
+            assert page.locator(".rail").evaluate("el => el.scrollLeft") > 0
+        dimensions = page.evaluate("() => ({content: document.documentElement.scrollWidth, viewport: innerWidth})")
+        assert dimensions["content"] <= dimensions["viewport"] + 2
         browser.close()

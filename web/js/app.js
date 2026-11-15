@@ -29,13 +29,6 @@ function h(tag, attrs, ...kids) {
   }
   return el;
 }
-const svgNS = "http://www.w3.org/2000/svg";
-function s(tag, attrs) {
-  const el = document.createElementNS(svgNS, tag);
-  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
-  return el;
-}
-
 const ICONS = {
   book: '<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 0 2 2h13v-4M8 7h7M8 11h5"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
@@ -120,18 +113,6 @@ function emptyState(title, text) {
     h("a", { class: "btn btn-primary", href: "#/", style: "display:inline-grid;place-items:center;text-decoration:none" }, "Poser une question"));
 }
 
-/* ----- infobulle ----- */
-const tip = $("#tip");
-function showTip(e, title, text) {
-  tip.replaceChildren(h("b", {}, title), h("span", {}, text));
-  tip.hidden = false;
-  const r = (e.currentTarget || e.target).getBoundingClientRect();
-  const x = Math.min(innerWidth - 320, Math.max(8, r.left + r.width / 2 - 140));
-  tip.style.left = `${x}px`;
-  tip.style.top = `${Math.max(8, r.top - tip.offsetHeight - 10)}px`;
-}
-const hideTip = () => (tip.hidden = true);
-
 /* ----- tiroir de détail ----- */
 let lastFocus = null;
 function openDrawer(content) {
@@ -213,49 +194,35 @@ function landing() {
   );
 }
 
-function reading(d) {
-  const panel = (art, title, value, text) => h("div", { class: "rpanel" },
-    h("span", { class: "rico", html: ART[art] }), h("p", { class: "k" }, title), h("p", { class: "v" }, value), h("p", { class: "d" }, text));
-  return h("section", { class: "reading", "aria-label": "Verdicts" },
-    panel("syringe", "Comment obtenir la réponse", "Par essai", d.verdict.R_texte),
-    panel("heart", "Force de la preuve atteignable", "Par essai", "Les niveaux restent ceux de chaque essai ; aucun niveau global n'est calculé."),
-    panel("kit", "Gains possibles", "Par essai", "Consultez les gains et conditions dans les fiches des essais retenus."));
+function resultSummary(d) {
+  const pending = [
+    d.a_completer.length && h("a", { href: "#/completer" }, `${fmt(d.a_completer.length)} à compléter`),
+    d.en_cours.length && h("a", { href: "#/encours" }, `${fmt(d.en_cours.length)} en cours`),
+  ].filter(Boolean);
+  return h("section", { class: "result-summary", "aria-label": "Chiffres clés" },
+    h("div", { class: "rpanel" }, h("p", { class: "k" }, "Essais examinés"),
+      h("p", { class: "v num" }, fmt(d.rejection.total)),
+      pending.length ? h("p", { class: "d pending-counts" }, pending) : null),
+    h("div", { class: "rpanel key" }, h("p", { class: "k" }, "Essais retenus"),
+      h("p", { class: "v num" }, fmt(d.retenus.length)),
+      h("p", { class: "d" }, `${fmt(d.internes.length)} interne${d.internes.length > 1 ? "s" : ""} · ${fmt(d.externes.length)} externe${d.externes.length > 1 ? "s" : ""}`)),
+    h("div", { class: "rpanel" }, h("p", { class: "k" }, "Essais écartés"),
+      h("p", { class: "v num" }, fmt(d.ecartes.length)),
+      h("a", { class: "metric-link", href: "#/ecartes" }, "Voir les motifs")));
 }
 
-function blister(d) {
-  const items = [...d.retenus, ...d.ecartes, ...d.a_completer, ...d.en_cours];
-  if (!items.length) return h("p", { class: "note" }, "Aucun essai dans le corpus chargé.");
-  const groupOf = (t) => t.retenu ? t.index : t.statut === "exclu" ? `r${t.etape_rejet}` : t.statut;
-  const defs = [["interne", "Retenus internes", "#1b7f58"], ["externe", "Retenus externes", "#86d1ae"],
-    ["r1", REJECT[1][0], REJECT[1][1]], ["r2", REJECT[2][0], REJECT[2][1]],
-    ["a_completer", "À compléter", "#BDBDBD"], ["en_cours", "En cours", "#D9D9D9"]];
-  const cols = 13, cell = 32, rows = Math.ceil(items.length / cols);
-  const svg = s("svg", { class: "blister", viewBox: `0 0 ${cols * cell} ${rows * cell}`, role: "group", "aria-label": `${items.length} essais examinés` });
-  items.forEach((t, i) => {
-    const group = groupOf(t), cx = (i % cols) * cell + cell / 2, cy = Math.floor(i / cols) * cell + cell / 2;
-    const status = t.retenu ? `retenu ${t.index}, preuve ${shown(t.E)}` : t.statut === "exclu" ? t.raison : t.statut === "en_cours" ? "en cours" : "à compléter";
-    const node = s("g", { class: "dimple", tabindex: "0", role: "button", "data-g": group, "aria-label": `${labelOf(t)} : ${status}` });
-    node.style.animationDelay = `${i * 8}ms`;
-    node.append(s("circle", { class: "cup", cx, cy, r: 13, fill: t.retenu ? "#FFFFFF" : defs.find(([g]) => g === group)?.[2] || "#F5F5F5" }));
-    if (t.retenu) node.append(t.index === "interne" ? s("circle", { cx, cy, r: 8.5, fill: E_COLOR[t.E] })
-      : s("circle", { cx, cy, r: 7.5, fill: "none", stroke: E_COLOR[t.E], "stroke-width": 3.2 }));
-    node.addEventListener("mouseenter", (e) => showTip(e, labelOf(t), `${t.titre} — ${status}`));
-    node.addEventListener("focus", (e) => showTip(e, labelOf(t), status));
-    node.addEventListener("mouseleave", hideTip); node.addEventListener("blur", hideTip);
-    node.addEventListener("click", () => { hideTip(); openDrawer(trialDrawer(t)); });
-    node.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); node.dispatchEvent(new Event("click")); } });
-    svg.append(node);
-  });
-  let active = null;
-  const legend = h("ul", { class: "legend" }, defs.filter(([g]) => items.some((t) => groupOf(t) === g)).map(([group, title, color]) =>
-    h("li", {}, h("button", { type: "button", "aria-pressed": "false", onclick: (e) => {
-      active = active === group ? null : group; svg.classList.toggle("is-filtering", active !== null);
-      svg.querySelectorAll(".dimple").forEach((n) => n.classList.toggle("on", n.dataset.g === active));
-      legend.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", "false"));
-      if (active) e.currentTarget.setAttribute("aria-pressed", "true");
-    } }, h("span", { class: "sw", style: `background:${color}` }), h("span", {}, title), h("span", { class: "n num" }, items.filter((t) => groupOf(t) === group).length)))));
-  return h("div", { class: "blister-wrap" }, h("div", { class: "panel-box" }, svg), h("div", {}, legend,
-    h("p", { class: "t-sub", style: "margin-top:12px;font-family:inherit" }, "Cliquez sur une alvéole pour le détail, sur une légende pour isoler un statut.")));
+function retainedPreview(d) {
+  return h("section", { class: "section retained-preview", "aria-labelledby": "retained-title" },
+    h("div", { class: "result-section-head" }, h("h3", { id: "retained-title" }, "Essais retenus"),
+      d.retenus.length > 0 && h("a", { href: "#/essais" }, "Tout voir", icon("arrow", 16))),
+    d.retenus.length > 3 && h("p", { class: "t-sub preview-count" }, `Aperçu de 3 essais sur ${fmt(d.retenus.length)} retenus.`),
+    d.retenus.length ? h("ul", { class: "trial-preview" }, d.retenus.slice(0, 3).map((t) =>
+      h("li", {}, h("button", { class: "trial-preview-button", type: "button", onclick: () => openDrawer(trialDrawer(t)) },
+        h("span", { class: "trial-preview-info" }, h("span", { class: "t-title" }, t.titre),
+          h("span", { class: "trial-preview-meta" }, kindBadge(t.index), h("span", { class: "t-sub" }, labelOf(t)),
+            E_COLOR[t.E] && h("span", { class: "badge badge-soft" }, `Preuve ${t.E}`))),
+        icon("arrow", 18)))))
+      : h("p", { class: "sub" }, "Aucun essai retenu pour cette question."));
 }
 
 function funnelBars(d, withDrops) {
@@ -275,19 +242,15 @@ function funnelBars(d, withDrops) {
 
 function overview() {
   const d = state.dossier;
-  const nbTotal = d.rejection.total;
-  const wrap = h("div", {},
-    pageHead(d.question, `${fmt(nbTotal)} essais examinés : ${d.internes.length} interne${d.internes.length > 1 ? "s" : ""} et ${d.externes.length} externe${d.externes.length > 1 ? "s" : ""} retenus, ${d.ecartes.length} exclus, ${d.a_completer.length} à compléter, ${d.en_cours.length} en cours.`, ["heart", "tubes", "syringe"]),
-    reading(d),
-    h("section", { class: "section" }, h("h3", {}, `${fmt(nbTotal)} essais, une alvéole chacun`),
-      h("p", { class: "sub" }, "Chaque essai conserve son statut : interne ou externe retenu, exclu, à compléter ou en cours."), blister(d)),
-    h("section", { class: "section" }, h("h3", {}, "Disponibilité des données individuelles"),
-      h("p", { class: "sub" }, "Les effectifs randomisés ne remplacent pas un comptage individuel S0 à S4."), h("div", { class: "panel-box" }, funnelBars(d, true),
-        h("p", { style: "margin-top:16px" }, h("a", { href: "#/patients" }, "Voir les données disponibles")))),
-  );
-  document.body.classList.add("reveal");
-  setTimeout(() => document.body.classList.remove("reveal"), 1800);
-  return wrap;
+  return h("div", { class: "overview" },
+    pageHead("Résultats de l'analyse", d.question, ["clipboard"]),
+    resultSummary(d), retainedPreview(d),
+    h("section", { class: "result-actions panel-box", "aria-label": "Dossier de faisabilité" },
+      h("div", {}, h("h3", {}, "Dossier de faisabilité"), h("p", {}, "Résultats détaillés, conditions et sources.")),
+      h("div", { class: "result-actions-buttons" },
+        h("a", { class: "btn btn-primary", href: "#/dossier" }, icon("file", 16), "Ouvrir le dossier"),
+        h("a", { class: "btn btn-ghost", href: `/api/dossier.md?question=${encodeURIComponent(state.question)}`, download: "dossier_trialrevive.md" },
+          icon("download", 16), "Télécharger"))));
 }
 
 function trialsView() {
@@ -497,7 +460,7 @@ function renderNav(current) {
 }
 
 async function render() {
-  hideTip(); $("#drawer").hidden = true;
+  $("#drawer").hidden = true;
   const r = route();
   document.body.dataset.state = r === "accueil" ? "landing" : "work";
   renderNav(r);

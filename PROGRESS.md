@@ -1,6 +1,6 @@
 # PROGRESS — Avancement TrialRevive
 
-Dernière mise à jour : **14 novembre 2026**, par Codex. État constaté dans l'environnement cloud ; aucune publication ni aucun push effectué pendant cette mise à jour.
+Dernière mise à jour : **15 novembre 2026**, par Codex. État constaté dans l'environnement cloud.
 
 ## Tableau d'avancement
 
@@ -73,3 +73,25 @@ Veille automatique de littérature et notifications push, horloge commune des da
 - PostgreSQL par défaut ; mode fichier fictif uniquement sur choix explicite. Connexion distante non validée dans le cloud.
 - 91 tests du site réussis ; 52 tests Backend existants réussis avant intégration. Parcours Chromium et téléchargement du dossier validés, sans ressource distante.
 - Site de démonstration démarré sur le port 8766 ; détails et commandes dans `docs/INTEGRATION_FRONT.md`.
+
+## Campagne de tests globale après intégration du front
+
+- **161 tests réussis, aucun échec ni test ignoré** : 93 dans `tests/`, 52 dans `Backend/` et 16 dans `trialrevive/`, exécutés séparément.
+- Parcours Chromium validés sur ordinateur (1440 px), tablette (820 px) et mobile (390 px), sur les neuf onglets jusqu'au téléchargement du dossier ; corpus vide et corpus de 500 fiches fictives également vérifiés. Aucune erreur JavaScript ni requête distante pendant ces parcours.
+- Défaut corrigé dans `web/css/app.css` : le dernier onglet sortait de l'écran sur mobile. La barre inférieure peut maintenant défiler horizontalement. Deux tests de régression couvrent les neuf onglets à 390 et 820 px.
+- Dépendances (`pip check`) et syntaxe JavaScript contrôlées. Les 19 fichiers Backend suivis restent identiques, empreintes SHA-256 vérifiées.
+- Connexion PostgreSQL réelle non testée : identifiants absents de l'environnement et résolution DNS des hôtes Supabase en échec. L'absence de configuration renvoie HTTP 503 sans données fictives de remplacement.
+- Rapport, captures et résultats XML disponibles dans `outputs/verification/` (ignoré par Git). Correction mobile, tests et documentation conservés localement ; aucun push pendant cette campagne.
+
+## Suppression des cercles — 15 novembre 2026
+
+- Retrait complet de la grille de cercles de l'aperçu, de sa légende et de son code associé. Total des essais, répartition par statut et accès aux fiches dans les onglets conservés.
+- Huit tests navigateur/charte réussis et syntaxe JavaScript valide. Six parcours avec réponses API fictives de 0, 8 et 19 364 essais sur ordinateur et mobile confirment que la hauteur de l'aperçu ne dépend plus du nombre d'essais ; aucune erreur JavaScript ni requête distante.
+- Changements limités au front et à la documentation. Les 19 fichiers Backend suivis restent identiques par SHA-256. Captures et mesures dans `outputs/verification/sans-cercles/` ; aucun push effectué.
+
+## Aperçu des résultats allégé — 15 novembre 2026
+
+- Retrait des cartes répétitives « Par essai » et du bloc des données patients non calculées de l'aperçu. Question, trois compteurs, trois fiches retenues au maximum et accès au dossier conservés ; détails et sources toujours accessibles.
+- Liens vers les fiches à compléter et les essais en cours affichés lorsque ces statuts sont présents. L'aperçu conserve l'ordre des essais reçu et donne accès aux listes complètes.
+- Huit tests navigateur/charte réussis ; huit parcours fictifs couvrent les corpus vide, de démonstration, avec statuts supplémentaires et de 19 364 essais. Affichage final vérifié de 320 à 1440 pixels, sans débordement, y compris pour le compteur 190 000 sur petit écran.
+- Backend et API inchangés. Captures et résultats dans `outputs/verification/resultats-epures/`. Branche de livraison : `integration/front-backend-matcher`.
